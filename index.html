@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BSI 策略台原型 v6</title>
+  <style>
+    :root {
+      --ink: #242d35;
+      --muted: #68747d;
+      --canvas: #f4f6f3;
+      --panel: #ffffff;
+      --line: #d9dfd9;
+      --nav: #26343e;
+      --blue: #2164a7;
+      --red: #b7413e;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; overflow: hidden; color: var(--ink); background: var(--canvas); }
+    button { font: inherit; }
+    .app { height: 100vh; display: grid; grid-template-columns: 176px minmax(0, 1fr); }
+    .rail { display: grid; grid-template-rows: auto 1fr; gap: 26px; padding: 18px 12px; border-right: 1px solid var(--line); background: #fbfcfa; }
+    .brand { display: flex; align-items: center; gap: 9px; padding: 2px 4px; font-size: 20px; font-weight: 800; line-height: 1.05; }
+    .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; border: 2px solid var(--nav); border-radius: 6px; background: #fff5dd; font-size: 12px; }
+    .nav { display: grid; align-content: start; gap: 7px; }
+    .nav button { position: relative; min-height: 43px; padding: 10px 11px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #8c969b; text-align: left; font-weight: 720; cursor: pointer; }
+    .nav button:hover { background: #f0f4f2; color: var(--ink); }
+    .nav button.active { border-color: var(--nav); background: var(--nav); color: #fff; }
+    .badge { position: absolute; top: 7px; right: 8px; display: none; min-width: 17px; height: 17px; padding: 0 5px; border: 2px solid #fbfcfa; border-radius: 999px; background: var(--red); color: #fff; font-size: 10px; font-weight: 800; line-height: 13px; text-align: center; }
+    .badge.visible { display: block; }
+    .badge.dot { top: 17px; right: 11px; min-width: 9px; width: 9px; height: 9px; padding: 0; border-width: 1px; font-size: 0; line-height: 0; }
+    .stage { min-width: 0; min-height: 0; }
+    iframe { width: 100%; height: 100%; border: 0; display: block; background: var(--canvas); }
+    .placeholder { height: 100%; display: grid; place-items: center; background: var(--canvas); }
+    .placeholder-card { width: min(460px, calc(100% - 40px)); padding: 22px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+    .placeholder-card h1 { margin: 0; font-size: 22px; }
+    .placeholder-card p { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+    @media (max-width: 760px) {
+      body { overflow: auto; }
+      .app { min-height: 100vh; height: auto; grid-template-columns: 1fr; }
+      .rail { grid-template-columns: auto 1fr; grid-template-rows: auto; align-items: center; gap: 14px; padding: 10px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .nav { display: flex; overflow-x: auto; }
+      .nav button { white-space: nowrap; }
+      .stage { height: calc(100vh - 62px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail">
+      <div class="brand"><span class="brand-mark">BSI</span><span>策略台</span></div>
+      <nav class="nav" aria-label="主导航">
+        <button class="active" type="button" data-tab="strategy">策略输入</button>
+        <button type="button" data-tab="position">持仓分析</button>
+        <button type="button" data-tab="reminders">AI 提醒 <span class="badge" id="reminderBadge">1</span></button>
+        <button type="button" data-tab="review">AI 交易复盘</button>
+        <button type="button" data-tab="profile">我的 <span class="badge dot visible" id="dataBadge"></span></button>
+      </nav>
+    </aside>
+    <main class="stage" id="stage"></main>
+  </div>
+  <script>
+    const stage = document.getElementById('stage');
+    const buttons = [...document.querySelectorAll('[data-tab]')];
+    const badge = document.getElementById('reminderBadge');
+    const dataBadge = document.getElementById('dataBadge');
+    const pages = {
+      strategy: 'BSI_STRATEGY_INPUT_PROTOTYPE_v5.html?embed=1',
+      position: 'BSI_POSITION_ANALYSIS_PROTOTYPE_v5.html?embed=1',
+      reminders: 'BSI_AI_REMINDERS_PROTOTYPE_v2.html?embed=1',
+      review: 'BSI_AI_TRADE_REVIEW_PROTOTYPE_v3.html?embed=1',
+      profile: 'BSI_MY_PROTOTYPE_v1.html?embed=1'
+    };
+
+    function placeholder(title, copy) {
+      stage.innerHTML = `<section class="placeholder"><div class="placeholder-card"><h1>${title}</h1><p>${copy}</p></div></section>`;
+    }
+
+    function showTab(tab) {
+      buttons.forEach((button) => button.classList.toggle('active', button.dataset.tab === tab));
+      if (pages[tab]) {
+        const title = tab === 'strategy' ? '策略输入' : tab === 'position' ? '持仓分析' : tab === 'reminders' ? 'AI 提醒' : 'AI 交易复盘';
+        stage.innerHTML = `<iframe title="${title}" src="${pages[tab]}"></iframe>`;
+        return;
+      }
+    }
+
+    buttons.forEach((button) => button.addEventListener('click', () => showTab(button.dataset.tab)));
+    window.addEventListener('message', (event) => {
+      if (event.data?.type === 'bsi-pending-reminder') {
+        const count = Number(event.data.count) || 0;
+        badge.textContent = count;
+        badge.classList.toggle('visible', count > 0);
+      }
+      if (event.data?.type === 'bsi-data-connection') dataBadge.classList.toggle('visible', !event.data.connected);
+      if (event.data?.type === 'bsi-open-data-settings') showTab('profile');
+    });
+    const requestedTab = new URLSearchParams(window.location.search).get('tab');
+    showTab(['strategy', 'position', 'reminders', 'review', 'profile'].includes(requestedTab) ? requestedTab : 'strategy');
+  </script>
+</body>
+</html>
