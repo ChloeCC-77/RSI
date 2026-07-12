@@ -1,0 +1,1104 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BSI 策略输入 v5 原型</title>
+  <script>
+    const pageParams = new URLSearchParams(window.location.search);
+    if (pageParams.get("embed") === "1") {
+      document.documentElement.classList.add("embed");
+    } else window.location.replace("BSI_APP_PROTOTYPE_v5.html?tab=strategy");
+  </script>
+  <style>
+    :root {
+      --ink: #242d35;
+      --muted: #68747d;
+      --paper: #f4f6f3;
+      --panel: #ffffff;
+      --line: #d9dfd9;
+      --line-strong: #aeb9b0;
+      --nav: #26343e;
+      --blue: #2164a7;
+      --blue-soft: #eaf3ff;
+      --green: #197657;
+      --green-soft: #e9f7ef;
+      --amber: #9a6b22;
+      --amber-soft: #fff5dd;
+      --red: #ad4a47;
+      --red-soft: #fff0ef;
+      --dev: #7652a4;
+      --dev-soft: #f7f0ff;
+      --shadow: 0 10px 30px rgba(34, 49, 57, .08);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      color: var(--ink);
+      background: var(--paper);
+    }
+
+    button, input, textarea { font: inherit; }
+    button {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      border-radius: 7px;
+      padding: 7px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    button:hover { border-color: var(--line-strong); }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+      outline: 3px solid rgba(34, 85, 136, .24);
+      outline-offset: 2px;
+    }
+    .primary { background: var(--nav); color: #fff; border-color: var(--nav); }
+    .danger { color: var(--red); background: #fff8f7; border-color: #e0b2ad; }
+    .icon-btn {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 6px;
+    }
+    .icon {
+      width: 15px;
+      height: 15px;
+      display: inline-block;
+    }
+    .icon-pencil {
+      border-bottom: 2px solid currentColor;
+      transform: rotate(-35deg);
+      position: relative;
+    }
+    .icon-pencil::after {
+      content: "";
+      position: absolute;
+      right: -4px;
+      bottom: -2px;
+      border-left: 4px solid currentColor;
+      border-top: 3px solid transparent;
+      border-bottom: 3px solid transparent;
+    }
+
+    .app {
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 158px minmax(0, 1fr);
+    }
+    .rail {
+      height: 100vh;
+      border-right: 1px solid var(--line);
+      background: #fbfcfa;
+      padding: 18px 12px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 18px;
+    }
+    .brand {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-weight: 760;
+      line-height: 1.1;
+    }
+    .brand-mark {
+      width: 29px;
+      height: 29px;
+      border-radius: 6px;
+      border: 2px solid var(--nav);
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      background: var(--amber-soft);
+    }
+    .nav { display: grid; align-content: start; gap: 8px; }
+    .nav button {
+      width: 100%;
+      text-align: left;
+      border-color: transparent;
+      background: transparent;
+      padding: 10px 9px;
+      font-weight: 650;
+      color: #8a8d8f;
+    }
+    .nav .active { background: var(--nav); color: #fff; border-color: var(--nav); }
+    .nav button:not(.active) { cursor: default; }
+    .prototype-note { display: none; }
+
+    main {
+      height: 100vh;
+      min-width: 0;
+      display: grid;
+      grid-template-rows: 88px minmax(0, 1fr);
+    }
+    .topbar {
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 26px;
+    }
+    h1 {
+      margin: 0;
+      font-family: inherit;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+    .topbar p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .badges { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 12px;
+      color: var(--muted);
+      background: #fff;
+      white-space: nowrap;
+    }
+    .badge.green { color: var(--green); background: var(--green-soft); border-color: #9fcfbd; }
+    .badge.blue { color: var(--blue); background: var(--blue-soft); border-color: #b7cde5; }
+    .badge.amber { color: var(--amber); background: var(--amber-soft); border-color: #ddbd8d; }
+    .badge.red { color: var(--red); background: var(--red-soft); border-color: #e4b7b2; }
+    .badge.dev {
+      color: var(--dev);
+      border-color: rgba(122,61,184,.35);
+      background: var(--dev-soft);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    html.embed .rail { display: none; }
+    html.embed .app { grid-template-columns: minmax(0, 1fr); }
+    html.embed main { height: 100vh; }
+
+    .workspace {
+      min-height: 0;
+      padding: 16px 22px 20px;
+      display: grid;
+      grid-template-rows: minmax(318px, 43vh) minmax(0, 1fr);
+      gap: 14px;
+      overflow: hidden;
+    }
+    .top-grid {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(460px, 1.35fr) minmax(350px, .65fr);
+      gap: 14px;
+    }
+    .panel {
+      min-height: 0;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      overflow: hidden;
+    }
+    .panel-head {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .panel-title { font-weight: 760; }
+    .panel-actions { display: flex; align-items: center; gap: 8px; }
+    .panel-actions button:disabled {
+      opacity: .42;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .panel-body {
+      min-height: 0;
+      padding: 12px 14px;
+      overflow: auto;
+    }
+    .input-body {
+      display: grid;
+      grid-template-rows: minmax(142px, 1fr) auto;
+      gap: 10px;
+      overflow: hidden;
+    }
+    textarea {
+      width: 100%;
+      height: 100%;
+      min-height: 130px;
+      resize: none;
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      border-radius: 7px;
+      padding: 12px;
+      line-height: 1.55;
+      color: var(--ink);
+    }
+    textarea.source-readonly {
+      border-color: var(--line-strong);
+      background: #fbfcfa;
+      color: #3d4650;
+      cursor: default;
+    }
+    textarea.source-editing {
+      border-color: #6ea2d4;
+      background: #fff;
+    }
+    textarea::placeholder { color: #98a2ad; }
+    .input-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .dropzone {
+      border: 1.5px dashed var(--line-strong);
+      border-radius: 7px;
+      padding: 12px;
+      background: #f8fbf8;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+    .dropzone strong { display: block; }
+    .dropzone span { color: var(--muted); font-size: 12px; }
+    .dropzone.dragging { background: var(--blue-soft); border-color: var(--blue); }
+    .history-list { display: grid; gap: 8px; max-height: 420px; overflow: auto; }
+    .parse-row {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 8px 9px;
+      display: grid;
+      grid-template-columns: 5px 1fr;
+      gap: 9px;
+      background: #fff;
+    }
+    .parse-line { border-radius: 999px; background: var(--green); }
+    .parse-line.warn { background: var(--amber); }
+    .parse-line.bad { background: var(--red); }
+    .parse-row strong { font-size: 12px; }
+    .parse-row p { margin: 2px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+
+    .search {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      padding: 8px 10px;
+      color: var(--ink);
+    }
+    .record-list {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+      max-height: 100%;
+      overflow: auto;
+      padding-right: 2px;
+    }
+    .record-row {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 9px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      cursor: pointer;
+    }
+    .record-row:hover { border-color: var(--line-strong); }
+    .record-row.selected {
+      background: #f4f8ff;
+      border-color: var(--blue);
+      box-shadow: inset 3px 0 0 var(--blue);
+    }
+    .record-time { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .record-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 700;
+      min-width: 0;
+    }
+    .record-actions { display: flex; gap: 5px; align-items: center; }
+
+    .strategy-panel { grid-template-rows: auto auto minmax(0, 1fr); }
+    .strategy-head {
+      display: grid;
+      grid-template-columns: auto minmax(250px, 360px);
+      align-items: center;
+      gap: 14px;
+    }
+    .scope-pill { margin-left: 8px; }
+    .tabs {
+      display: flex;
+      gap: 6px;
+      padding: 10px 14px 0;
+      border-bottom: 1px solid var(--line);
+      overflow: visible;
+    }
+    .tab {
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+      border-bottom: 0;
+      background: transparent;
+      font-weight: 690;
+      color: var(--ink);
+    }
+    .tab.active { background: var(--nav); color: #fff; border-color: var(--nav); }
+    .tab:disabled {
+      opacity: 1;
+      cursor: not-allowed;
+      background: #f4f6f3;
+      color: #8d9399;
+      border-color: var(--line);
+    }
+    .question {
+      display: inline-grid;
+      place-items: center;
+      width: 18px;
+      height: 18px;
+      border: 1px solid var(--line-strong);
+      border-radius: 50%;
+      margin-left: 4px;
+      color: var(--amber);
+      position: relative;
+      background: #fff;
+    }
+    .question:hover::after {
+      content: "这一部分需要用户确认后才会应用到后面的 AI 策略提醒当中。";
+      position: absolute;
+      right: 0;
+      bottom: 26px;
+      width: 320px;
+      white-space: normal;
+      padding: 8px 10px;
+      border-radius: 7px;
+      background: var(--nav);
+      color: white;
+      border: 1px solid var(--nav);
+      font-size: 12px;
+      line-height: 1.45;
+      z-index: 10;
+      font-weight: 500;
+    }
+    .cards {
+      min-height: 0;
+      overflow: auto;
+      padding: 12px 14px 14px;
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      padding: 10px 11px;
+      display: grid;
+      gap: 6px;
+    }
+    .card.conflict { border-color: #d9a19b; background: #fff8f7; }
+    .card.confirmed { border-color: #96cbb8; background: #f8fffb; }
+    .card-main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 154px;
+      gap: 10px;
+      align-items: start;
+    }
+    .card-title {
+      font-weight: 760;
+      line-height: 1.32;
+      margin-bottom: 3px;
+    }
+    .card-text {
+      margin: 0;
+      color: #343a41;
+      line-height: 1.42;
+    }
+    .card-source {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .tag-list { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .card-actions {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+      align-items: center;
+      margin-top: 8px;
+    }
+    .editable[contenteditable="true"] {
+      border: 1px dashed var(--blue);
+      background: #f8fbff;
+      padding: 5px;
+      border-radius: 6px;
+    }
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .compare-box {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 8px;
+      background: #fff;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .compare-box strong { display: block; margin-bottom: 4px; }
+    .empty {
+      border: 1px dashed var(--line-strong);
+      border-radius: 7px;
+      padding: 26px;
+      text-align: center;
+      color: var(--muted);
+      background: #fbfcfa;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(36,42,49,.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 20px;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal {
+      width: min(520px, 100%);
+      background: var(--panel);
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .modal header, .modal footer {
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+    }
+    .modal footer { border-top: 1px solid var(--line); border-bottom: 0; justify-content: flex-end; }
+    .modal h3 { margin: 0; font-size: 18px; }
+    .modal .content { padding: 14px; color: var(--muted); line-height: 1.55; }
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 70;
+      background: var(--nav);
+      color: white;
+      border-radius: 7px;
+      padding: 10px 12px;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: .18s ease;
+      pointer-events: none;
+      max-width: 360px;
+      line-height: 1.45;
+      font-size: 13px;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 1100px) {
+      body { overflow: auto; }
+      .app { height: auto; min-height: 100vh; grid-template-columns: 1fr; }
+      .rail { height: auto; grid-template-rows: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+      .nav { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      main { height: auto; }
+      .workspace { grid-template-rows: auto auto; overflow: visible; }
+      .top-grid, .strategy-head, .compare { grid-template-columns: 1fr; }
+      .panel { min-height: 360px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail">
+      <div class="brand"><span class="brand-mark">BSI</span><span>Strategy<br />Desk</span></div>
+      <nav class="nav" aria-label="一级导航">
+        <button class="active">策略输入</button>
+        <button>持仓分析</button>
+        <button>AI 提醒</button>
+        <button>AI 交易复盘</button>
+        <button>我的</button>
+      </nav>
+      <div class="prototype-note">原型批注不属于对客文案。主界面只保留用户需要操作和识别的信息。</div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <h1>策略输入</h1>
+          <p>沉淀复盘与策略，生成可确认的结构化规则。</p>
+        </div>
+        <div class="badges">
+          <span class="badge blue">TXT / MD / CSV / XLSX</span>
+          <span class="badge">不读取图片、截图、语音</span>
+          <span class="badge green">仅用于 BSI 策略分析</span>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <div class="top-grid">
+          <section class="panel">
+            <div class="panel-head">
+              <div class="panel-title">策略输入框</div>
+              <div class="panel-actions">
+                <button id="parseHistoryBtn">解析历史</button>
+                <button class="icon-btn" id="editSource" aria-label="编辑当前历史记录" disabled><span class="icon icon-pencil"></span></button>
+                <button class="primary" id="saveInput">保存并结构化</button>
+              </div>
+            </div>
+            <div class="panel-body input-body">
+              <textarea id="sourceText" placeholder="请输入您最近的复盘策略……"></textarea>
+
+              <label class="dropzone" id="dropzone">
+                <input id="fileInput" type="file" accept=".txt,.md,.markdown,.csv,.xlsx" hidden />
+                <span><strong>拖拽文件到这里，或点击选择文件</strong><span>支持 TXT、Markdown、CSV、XLSX</span></span>
+                <span class="badge">上传</span>
+              </label>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <div class="panel-title">时间上传记录</div>
+              <span class="badge dev">可复选</span>
+            </div>
+            <div class="panel-body">
+              <input id="recordSearch" class="search" placeholder="搜索 MSFT、NVDA、QQQM..." />
+              <div id="recordList" class="record-list"></div>
+            </div>
+          </section>
+        </div>
+
+        <section class="panel strategy-panel">
+          <div class="panel-head strategy-head">
+            <div>
+              <span class="panel-title">结构化策略</span>
+              <span id="scopePill" class="badge blue scope-pill">全部历史</span>
+            </div>
+            <input id="strategySearch" class="search" placeholder="搜索 ticker、规则、来源、风险标签..." />
+          </div>
+          <div class="tabs" id="tabs"></div>
+          <div class="cards" id="cards"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header><h3 id="modalTitle">标题</h3><button class="icon-btn" id="closeModal" aria-label="关闭">x</button></header>
+      <div class="content" id="modalContent"></div>
+      <footer id="modalFooter"></footer>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const tabs = [
+      ["summary", "策略摘要"],
+      ["risk", "情绪风险标签"],
+      ["symbols", "标的及策略"],
+      ["rules", "退出止盈 Roll 的规则"],
+      ["candidates", "候选提醒条件"]
+    ];
+
+    let selectedRecordId = null;
+    let activeTab = "summary";
+    let pendingDelete = null;
+    let sourceMode = "new";
+
+    let records = [
+      {
+        id: "rec-new",
+        time: "2026-07-09 16:55",
+        title: "新增复盘与策略摘要",
+        status: "parsed",
+        source: "文本输入",
+        text: "我需要更新一下我对 NVDA 的思考。现在更希望释放现金，接受正股被 210 Call 走，再根据波动重新 Sell Put。"
+      },
+      {
+        id: "rec-nvda",
+        time: "2026-07-09 16:35",
+        title: "NVDA 资金释放与策略更新",
+        status: "updated",
+        source: "文本输入",
+        text: "NVDA 有 100 股正股和 210 Covered Call，也有 7 月 31 日 Sell Put。更倾向释放现金，接受正股被 Call 走。"
+      },
+      {
+        id: "rec-msft",
+        time: "2026-07-09 13:20",
+        title: "MSFT 轮子策略与 415 CC 风险",
+        status: "parsed",
+        source: "Markdown",
+        text: "微软目前有 100 股正股和 415 Call。看涨但希望股价不要明显超过 415，否则接受利润被锁定。"
+      },
+      {
+        id: "rec-qqqm",
+        time: "2026-07-08 21:10",
+        title: "QQQM 长期左侧买入计划",
+        status: "parsed",
+        source: "TXT",
+        text: "QQQM 跌到 282 时买入 12 股，约 5 成仓位。如果再跌 20%，继续长期左侧布局。"
+      }
+    ];
+
+    let parseHistory = [
+      { type: "ok", title: "2026-07-09 16:35 · 文本输入已解析", text: "识别到 NVDA 策略更新语义，等待用户确认是否覆盖旧结论。" },
+      { type: "warn", title: "部分解析：NVDA-trades.csv", text: "部分工作表为空或字段无法识别，本文件已部分解析。" },
+      { type: "bad", title: "解析失败：MSFT-options.xlsx", text: "表格无法解析，请检查格式或另存为 CSV/XLSX 后重新上传。" },
+      { type: "bad", title: "解析失败：memo.png", text: "文件格式不支持。" }
+    ];
+
+    let cards = [
+      {
+        id: "sum-nvda",
+        tab: "summary",
+        recordId: "rec-nvda",
+        title: "NVDA 当前结论：释放现金优先",
+        text: "接受正股被 210 Call 走，再根据波动重新 Sell Put。不要因为短期波动提前乱动 7 月 31 日的 Put。",
+        source: "来源：2026-07-09 16:35 · NVDA 资金释放与策略更新",
+        tags: ["NVDA", "已更新"]
+      },
+      {
+        id: "sum-msft",
+        tab: "summary",
+        recordId: "rec-msft",
+        title: "MSFT 轮子策略：看涨但接受 415 上方锁定利润",
+        text: "100 股正股来自卖 Put 被行权，搭配 415 Covered Call。若股价快速明显超过 415，需要复核是否接受被 call 走或考虑 Roll。",
+        source: "来源：2026-07-09 13:20 · MSFT 轮子策略与 415 CC 风险",
+        tags: ["MSFT", "Covered Call"]
+      },
+      {
+        id: "sum-qqqm",
+        tab: "summary",
+        recordId: "rec-qqqm",
+        title: "QQQM：长期左侧买入",
+        text: "282 附近买入 12 股；若再跌 20%，继续分批布局。",
+        source: "来源：2026-07-08 21:10 · QQQM 长期左侧买入计划",
+        tags: ["QQQM", "长期"]
+      },
+      {
+        id: "risk-nvda",
+        tab: "risk",
+        recordId: "rec-nvda",
+        title: "短期浮亏导致提前 Roll 的风险",
+        text: "当 Sell Put 处于亏损时，容易被短期波动驱动提前操作。应等临近到期再结合计划处理。",
+        source: "来源：2026-07-09 16:35 · NVDA 资金释放与策略更新",
+        tags: ["情绪风险", "提前行动"]
+      },
+      {
+        id: "symbol-nvda",
+        tab: "symbols",
+        recordId: "rec-nvda",
+        title: "NVDA：100 股正股 + 210 CC + 7 月 31 日 Sell Put",
+        text: "短 Call 与 Sell Put 的目标有冲突，但用户可接受正股被 call 走，释放现金后继续 Sell Put。",
+        source: "来源：2026-07-09 16:35 · NVDA 资金释放与策略更新",
+        tags: ["NVDA", "组合"]
+      },
+      {
+        id: "symbol-msft",
+        tab: "symbols",
+        recordId: "rec-msft",
+        title: "MSFT：100 股正股 + 415 Covered Call",
+        text: "轮子策略延续，正股上方收益被短 Call 限制。",
+        source: "来源：2026-07-09 13:20 · MSFT 轮子策略与 415 CC 风险",
+        tags: ["MSFT", "轮子"]
+      },
+      {
+        id: "rule-msft",
+        tab: "rules",
+        recordId: "rec-msft",
+        title: "MSFT 快速突破 415 时提前复核",
+        text: "不只在临近到期提醒。如果 MSFT 快速明显超过 415，应提前检查接受被 call 走、Roll、平仓或维持原计划。",
+        source: "来源：2026-07-09 13:20 · MSFT 轮子策略与 415 CC 风险",
+        tags: ["MSFT", "退出规则"]
+      },
+      {
+        id: "cand-msft",
+        tab: "candidates",
+        recordId: "rec-msft",
+        title: "MSFT 快速超过 415 后复核 Covered Call",
+        text: "条件：MSFT 快速显著超过 415，或距离到期变近且仍在 415 上方。",
+        source: "来源：2026-07-09 13:20 · MSFT 轮子策略与 415 CC 风险",
+        tags: ["候选", "未应用"],
+        candidate: true
+      },
+      {
+        id: "cand-qqqm",
+        tab: "candidates",
+        recordId: "rec-qqqm",
+        title: "QQQM 到 282 时提醒检查买入计划",
+        text: "条件：QQQM 到达 282。提醒检查是否按计划买入 12 股。",
+        source: "来源：2026-07-08 21:10 · QQQM 长期左侧买入计划",
+        tags: ["候选", "未应用"],
+        candidate: true
+      }
+    ];
+
+    const $ = (selector) => document.querySelector(selector);
+    const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+
+    function toast(text) {
+      const el = $("#toast");
+      el.textContent = text;
+      el.classList.add("show");
+      clearTimeout(toast.timer);
+      toast.timer = setTimeout(() => el.classList.remove("show"), 2300);
+    }
+
+    function badge(label) {
+      let cls = "";
+      if (/更新|确认/.test(label)) cls = "green";
+      if (/MSFT|NVDA|QQQM/.test(label)) cls = "blue";
+      if (/候选|未应用/.test(label)) cls = "amber";
+      if (/删除|失败/.test(label)) cls = "red";
+      return `<span class="badge ${cls}">${label}</span>`;
+    }
+
+    function renderHistory() {
+      return parseHistory.map(item => `
+        <div class="parse-row">
+          <div class="parse-line ${item.type === "warn" ? "warn" : item.type === "bad" ? "bad" : ""}"></div>
+          <div><strong>${item.title}</strong><p>${item.text}</p></div>
+        </div>
+      `).join("");
+    }
+
+    function renderRecords() {
+      const q = $("#recordSearch").value.trim().toLowerCase();
+      const list = records.filter(record => !q || `${record.time} ${record.title} ${record.source} ${record.text}`.toLowerCase().includes(q));
+      $("#recordList").innerHTML = list.map(record => `
+        <div class="record-row ${selectedRecordId === record.id ? "selected" : ""}" tabindex="0" data-record="${record.id}">
+          <span class="record-time">${record.time.slice(5)}</span>
+          <span class="record-title">${record.title}</span>
+          <span class="record-actions">
+            <button class="icon-btn danger" data-delete-record="${record.id}" aria-label="删除 ${record.title}">x</button>
+          </span>
+        </div>
+      `).join("") || `<div class="empty">没有匹配的上传记录。</div>`;
+
+      $$(".record-row").forEach(row => {
+        row.addEventListener("click", (event) => {
+          if (event.target.closest("button")) return;
+          toggleRecord(row.dataset.record);
+        });
+        row.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            toggleRecord(row.dataset.record);
+          }
+        });
+      });
+      $$("[data-delete-record]").forEach(btn => btn.addEventListener("click", () => confirmDelete("record", btn.dataset.deleteRecord)));
+    }
+
+    function toggleRecord(id) {
+      selectedRecordId = selectedRecordId === id ? null : id;
+      const record = records.find(item => item.id === selectedRecordId);
+      $("#sourceText").value = record ? record.text : "";
+      sourceMode = record ? "view" : "new";
+      activeTab = firstEnabledTab();
+      renderAll();
+    }
+
+    function enterSourceEdit() {
+      if (!selectedRecordId) return;
+      sourceMode = "edit";
+      renderSourceState();
+      $("#sourceText").focus();
+      toast("已进入编辑态，修改后点击保存并结构化。");
+    }
+
+    function renderSourceState() {
+      const text = $("#sourceText");
+      const editButton = $("#editSource");
+      const saveButton = $("#saveInput");
+      text.classList.remove("source-readonly", "source-editing");
+      if (selectedRecordId && sourceMode === "view") {
+        text.readOnly = true;
+        text.classList.add("source-readonly");
+        editButton.disabled = false;
+        saveButton.disabled = true;
+        return;
+      }
+      text.readOnly = false;
+      text.classList.add("source-editing");
+      editButton.disabled = !selectedRecordId;
+      saveButton.disabled = false;
+    }
+
+    function availableTabs() {
+      return tabs.map(([id]) => id).filter(tab => cards.some(card => card.tab === tab && (!selectedRecordId || card.recordId === selectedRecordId)));
+    }
+
+    function firstEnabledTab() {
+      const enabled = availableTabs();
+      return enabled.includes(activeTab) ? activeTab : enabled[0] || "summary";
+    }
+
+    function renderTabs() {
+      const enabled = availableTabs();
+      if (!enabled.includes(activeTab)) activeTab = enabled[0] || "summary";
+      $("#tabs").innerHTML = tabs.map(([id, label]) => `
+        <button class="tab ${enabled.includes(id) && activeTab === id ? "active" : ""}" ${enabled.includes(id) ? "" : "disabled"} data-tab="${id}">
+          ${label}${id === "candidates" ? `<span class="question">?</span>` : ""}
+        </button>
+      `).join("");
+      $$("[data-tab]").forEach(btn => btn.addEventListener("click", () => {
+        if (btn.disabled) return;
+        activeTab = btn.dataset.tab;
+        renderAll();
+      }));
+    }
+
+    function filteredCards() {
+      const q = $("#strategySearch").value.trim().toLowerCase();
+      return cards.filter(card => {
+        if (card.tab !== activeTab) return false;
+        if (selectedRecordId && card.recordId !== selectedRecordId) return false;
+        const text = `${card.title} ${card.text} ${card.source} ${card.tags.join(" ")}`.toLowerCase();
+        return !q || text.includes(q);
+      });
+    }
+
+    function renderCards() {
+      const list = filteredCards();
+      $("#scopePill").textContent = selectedRecordId ? `仅看：${records.find(record => record.id === selectedRecordId)?.time || ""}` : "全部历史";
+      $("#cards").innerHTML = list.map(renderCard).join("") || `<div class="empty">当前没有结构化策略。</div>`;
+      $$("[data-delete-card]").forEach(btn => btn.addEventListener("click", () => confirmDelete("card", btn.dataset.deleteCard)));
+      $$("[data-edit-card]").forEach(btn => btn.addEventListener("click", () => makeEditable(btn.dataset.editCard)));
+      $$("[data-confirm-candidate]").forEach(btn => btn.addEventListener("click", () => confirmCandidate(btn.dataset.confirmCandidate)));
+    }
+
+    function renderCard(card) {
+      return `
+        <article class="card ${card.confirmed ? "confirmed" : ""}" data-card="${card.id}">
+          <div class="card-main">
+            <div>
+              <div class="card-title editable" data-editable-title="${card.id}" ondblclick="window.startCardEdit('${card.id}')">${card.title}</div>
+              <p class="card-text editable" data-editable-text="${card.id}" ondblclick="window.startCardEdit('${card.id}')">${card.text}</p>
+              <div class="card-source">${card.source}</div>
+            </div>
+            <div>
+              <div class="tag-list">${card.tags.map(badge).join("")}${card.confirmed ? badge("已进入 AI 提醒") : ""}</div>
+              <div class="card-actions">
+                ${card.candidate && !card.confirmed ? `<button class="primary" data-confirm-candidate="${card.id}">确认</button>` : ""}
+                <button class="icon-btn" data-edit-card="${card.id}" aria-label="编辑"><span class="icon icon-pencil"></span></button>
+                <button class="danger" data-delete-card="${card.id}">删除</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function makeEditable(id) {
+      const title = $(`[data-editable-title="${id}"]`);
+      const text = $(`[data-editable-text="${id}"]`);
+      [title, text].forEach(el => {
+        el.contentEditable = "true";
+        el.addEventListener("blur", saveEditable, { once: true });
+      });
+      text.focus();
+      toast("正在编辑，点击空白处自动保存。");
+    }
+    window.startCardEdit = makeEditable;
+
+    function saveEditable(event) {
+      const cardEl = event.target.closest("[data-card]");
+      const card = cards.find(item => item.id === cardEl.dataset.card);
+      if (!card) return;
+      card.title = cardEl.querySelector(`[data-editable-title="${card.id}"]`).innerText.trim();
+      card.text = cardEl.querySelector(`[data-editable-text="${card.id}"]`).innerText.trim();
+      card.tags = Array.from(new Set([...card.tags, "用户修正"]));
+      cardEl.querySelectorAll(".editable").forEach(el => el.contentEditable = "false");
+      renderAll();
+      toast("已自动保存。");
+    }
+
+    function confirmCandidate(id) {
+      const card = cards.find(item => item.id === id);
+      if (!card) return;
+      card.confirmed = true;
+      card.tags = card.tags.filter(tag => tag !== "未应用").concat("已确认");
+      toast("已应用到 AI 策略提醒。");
+      renderAll();
+    }
+
+    function confirmDelete(kind, id) {
+      pendingDelete = { kind, id };
+      const label = kind === "record"
+        ? records.find(item => item.id === id)?.title
+        : cards.find(item => item.id === id)?.title;
+      openModal("确认删除", `<p>删除后会从当前页面移除。</p><p><strong>${label || ""}</strong></p>`, [
+        { text: "取消", action: closeModal },
+        { text: "删除", className: "danger", action: performDelete }
+      ]);
+    }
+
+    function performDelete() {
+      if (!pendingDelete) return;
+      if (pendingDelete.kind === "record") {
+        records = records.filter(item => item.id !== pendingDelete.id);
+        cards = cards.filter(item => item.recordId !== pendingDelete.id);
+        if (selectedRecordId === pendingDelete.id) {
+          selectedRecordId = null;
+          sourceMode = "new";
+          $("#sourceText").value = "";
+        }
+      } else {
+        cards = cards.filter(item => item.id !== pendingDelete.id);
+      }
+      closeModal();
+      renderAll();
+      toast("已删除。");
+    }
+
+    function openModal(title, body, actions) {
+      $("#modalTitle").textContent = title;
+      $("#modalContent").innerHTML = body;
+      $("#modalFooter").innerHTML = "";
+      actions.forEach(action => {
+        const btn = document.createElement("button");
+        btn.textContent = action.text;
+        if (action.className) btn.className = action.className;
+        btn.addEventListener("click", action.action);
+        $("#modalFooter").appendChild(btn);
+      });
+      $("#modalBackdrop").classList.add("show");
+      $("#modalBackdrop").setAttribute("aria-hidden", "false");
+    }
+
+    function closeModal() {
+      $("#modalBackdrop").classList.remove("show");
+      $("#modalBackdrop").setAttribute("aria-hidden", "true");
+    }
+
+    function handleFile(file) {
+      const duplicate = records.some(record => record.title.toLowerCase().includes(file.name.toLowerCase().replace(/\.[^.]+$/, "")));
+      if (duplicate) {
+        openModal("同名文件", `<p>您现在上传的文件是同名的，请检查是否需要继续上传。</p><p><strong>${file.name}</strong></p>`, [
+          { text: "否", action: closeModal },
+          { text: "是", className: "primary", action: () => addUploadedFile(file) }
+        ]);
+      } else {
+        addUploadedFile(file);
+      }
+    }
+
+    function addUploadedFile(file) {
+      const ext = file.name.split(".").pop().toLowerCase();
+      const supported = ["txt", "md", "markdown", "csv", "xlsx"].includes(ext);
+      if (!supported) {
+        parseHistory.unshift({ type: "bad", title: `解析失败：${file.name}`, text: "文件格式不支持。" });
+      } else if (file.size === 0) {
+        parseHistory.unshift({ type: "bad", title: `解析失败：${file.name}`, text: "文件为空。" });
+      } else {
+        records.unshift({
+          id: crypto.randomUUID(),
+          time: "2026-07-09 17:20",
+          title: `${file.name} 策略复盘`,
+          status: "parsed",
+          source: ext.toUpperCase(),
+          text: `来自 ${file.name} 的策略复盘内容。`
+        });
+        parseHistory.unshift({ type: "ok", title: `2026-07-09 17:20 · ${file.name} 已解析`, text: "已生成上传记录。" });
+      }
+      closeModal();
+      showParseHistory();
+      renderAll();
+    }
+
+    $("#saveInput").addEventListener("click", () => {
+      if (selectedRecordId) {
+        if (sourceMode !== "edit") {
+          toast("请先点击铅笔进入编辑态。");
+          return;
+        }
+        const record = records.find(item => item.id === selectedRecordId);
+        if (record) record.text = $("#sourceText").value;
+        sourceMode = "view";
+        toast("已更新并重新结构化。");
+      } else {
+        records.unshift({
+          id: crypto.randomUUID(),
+          time: "2026-07-09 17:18",
+          title: "新增复盘与策略摘要",
+          status: "parsed",
+          source: "文本输入",
+          text: $("#sourceText").value
+        });
+        parseHistory.unshift({ type: "ok", title: "2026-07-09 17:18 · 文本输入已解析", text: "已生成上传记录。" });
+        toast("已保存并结构化。");
+      }
+      renderAll();
+    });
+    function showParseHistory() {
+      openModal("解析历史", `<div class="history-list">${renderHistory()}</div>`, [
+        { text: "关闭", action: closeModal }
+      ]);
+    }
+    $("#parseHistoryBtn").addEventListener("click", showParseHistory);
+    $("#editSource").addEventListener("click", enterSourceEdit);
+    $("#sourceText").addEventListener("dblclick", enterSourceEdit);
+    $("#recordSearch").addEventListener("input", renderRecords);
+    $("#strategySearch").addEventListener("input", renderCards);
+    $("#closeModal").addEventListener("click", closeModal);
+    $("#modalBackdrop").addEventListener("click", (event) => { if (event.target.id === "modalBackdrop") closeModal(); });
+
+    const dropzone = $("#dropzone");
+    const fileInput = $("#fileInput");
+    dropzone.addEventListener("click", () => fileInput.click());
+    dropzone.addEventListener("dragover", event => {
+      event.preventDefault();
+      dropzone.classList.add("dragging");
+    });
+    dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragging"));
+    dropzone.addEventListener("drop", event => {
+      event.preventDefault();
+      dropzone.classList.remove("dragging");
+      Array.from(event.dataTransfer.files).forEach(handleFile);
+    });
+    fileInput.addEventListener("change", () => Array.from(fileInput.files).forEach(handleFile));
+
+    function renderAll() {
+      renderRecords();
+      renderTabs();
+      renderCards();
+      renderSourceState();
+    }
+
+    renderAll();
+  </script>
+</body>
+</html>

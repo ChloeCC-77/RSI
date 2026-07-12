@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BSI AI 提醒 v2 原型</title>
+  <script>
+    const pageParams = new URLSearchParams(window.location.search);
+    if (pageParams.get('embed') === '1') document.documentElement.classList.add('embed');
+    else window.location.replace('BSI_APP_PROTOTYPE_v5.html?tab=reminders');
+  </script>
+  <style>
+    :root {
+      --ink: #242d35;
+      --muted: #68747d;
+      --canvas: #f4f6f3;
+      --panel: #fff;
+      --line: #d9dfd9;
+      --line-strong: #aeb9b0;
+      --nav: #26343e;
+      --blue: #2164a7;
+      --blue-soft: #eaf3ff;
+      --green: #197657;
+      --green-soft: #e9f7ef;
+      --amber: #9a6b22;
+      --amber-soft: #fff5dd;
+      --red: #ad4a47;
+      --red-soft: #fff0ef;
+      --shadow: 0 10px 30px rgba(34, 49, 57, .08);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; overflow: hidden; color: var(--ink); background: var(--canvas); }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid rgba(33, 100, 167, .22); outline-offset: 2px; }
+    .app { height: 100vh; display: grid; grid-template-columns: 176px minmax(0, 1fr); }
+    .rail { display: grid; grid-template-rows: auto 1fr; gap: 26px; padding: 18px 12px; border-right: 1px solid var(--line); background: #fbfcfa; }
+    .brand { display: flex; align-items: center; gap: 9px; padding: 2px 4px; font-size: 20px; font-weight: 800; line-height: 1.05; }
+    .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; border: 2px solid var(--nav); border-radius: 6px; background: var(--amber-soft); font-size: 12px; }
+    .nav { display: grid; align-content: start; gap: 7px; }
+    .nav button { min-height: 43px; padding: 10px 11px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #8c969b; text-align: left; font-weight: 720; }
+    .nav button.active { border-color: var(--nav); background: var(--nav); color: #fff; }
+    .nav button:not(.active) { cursor: default; }
+    html.embed .rail { display: none; }
+    html.embed .app { grid-template-columns: minmax(0, 1fr); }
+
+    main { min-width: 0; display: grid; grid-template-rows: 82px minmax(0, 1fr); }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 24px; border-bottom: 1px solid var(--line); background: #fff; }
+    h1 { margin: 0; font-size: 28px; letter-spacing: 0; }
+    .subline { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    .button { min-height: 32px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); font-size: 13px; font-weight: 760; white-space: nowrap; }
+    .button.primary { border-color: var(--nav); background: var(--nav); color: #fff; }
+    .button.blue { border-color: #b9d7f3; background: var(--blue-soft); color: var(--blue); }
+    .button.danger { border-color: #efc3c0; background: var(--red-soft); color: var(--red); }
+
+    .content { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px; padding: 14px 18px 18px; overflow: hidden; }
+    .data-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 38px; padding: 7px 10px; border: 1px solid #ecd39d; border-radius: 6px; background: var(--amber-soft); color: var(--amber); font-size: 12px; }
+    .data-banner button { padding: 0; border: 0; background: transparent; color: var(--blue); font-weight: 800; }
+    .workspace { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: var(--shadow); }
+    .table-tools { display: flex; align-items: center; justify-content: flex-start; gap: 8px; padding: 11px 13px; border-bottom: 1px solid var(--line); background: #fbfcfa; }
+    .result-count { margin-left: auto; }
+    .search { width: min(440px, 58vw); height: 34px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); font-size: 13px; }
+    .table-wrap { min-height: 0; overflow: auto; }
+    table { width: 100%; min-width: 1200px; border-collapse: collapse; table-layout: fixed; }
+    th, td { padding: 11px 12px; border-bottom: 1px solid #e7ebe7; vertical-align: top; text-align: left; font-size: 13px; }
+    th { position: sticky; top: 0; z-index: 2; background: #f7f9f7; color: var(--muted); font-size: 11px; font-weight: 800; white-space: nowrap; }
+    th:nth-child(1) { width: 105px; }
+    th:nth-child(2) { width: 190px; }
+    th:nth-child(3) { width: 250px; }
+    th:nth-child(4) { width: 250px; }
+    th:nth-child(5) { width: 175px; }
+    th:nth-child(6) { width: 82px; }
+    th:nth-child(7) { width: 100px; }
+    tbody tr:hover { background: #fbfcfb; }
+    .sort-button { padding: 0; border: 0; background: transparent; color: inherit; font-size: inherit; font-weight: inherit; }
+    .holding { font-size: 13px; font-weight: 800; line-height: 1.35; }
+    .condition { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; font-size: 12px; line-height: 1.55; }
+    .value-missing { color: var(--muted); }
+    .message { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; color: #34404a; font-size: 12px; line-height: 1.55; }
+    .message p { margin: 0; }
+    .message textarea { width: 100%; min-height: 74px; resize: vertical; padding: 8px; border: 1px solid #78a9d8; border-radius: 5px; background: #fff; color: var(--ink); line-height: 1.45; }
+    .message-actions { display: flex; align-items: start; gap: 5px; }
+    .icon-button { width: 28px; height: 28px; display: inline-grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--muted); font-size: 15px; line-height: 1; }
+    .icon-button:hover { border-color: #9bbde0; color: var(--blue); }
+    .source-cell { position: relative; }
+    .source-preview { display: block; overflow: hidden; color: var(--muted); font-size: 12px; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; cursor: help; }
+    .source-tooltip { position: absolute; top: calc(100% + 8px); right: 0; z-index: 6; display: none; width: 290px; padding: 9px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); box-shadow: var(--shadow); font-size: 12px; line-height: 1.45; }
+    .source-cell:hover .source-tooltip, .source-cell:focus-within .source-tooltip { display: block; }
+    .operation { display: flex; align-items: center; gap: 5px; }
+    .state-button { width: 27px; height: 27px; display: inline-grid; place-items: center; padding: 0; border: 1px solid #b7c3c8; border-radius: 5px; background: #fff; color: #53636d; font-size: 14px; font-weight: 800; }
+    .state-button.active.enabled { border-color: #a9ddc3; background: var(--green-soft); color: var(--green); }
+    .state-button.active.paused { border-color: #ecd39d; background: var(--amber-soft); color: var(--amber); }
+    .state-button.delete:hover { border-color: #efc3c0; background: var(--red-soft); color: var(--red); }
+    .state-button:disabled { cursor: not-allowed; opacity: .42; }
+    .status { display: inline-flex; align-items: center; min-height: 24px; padding: 3px 7px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--muted); font-size: 11px; font-weight: 800; white-space: nowrap; }
+    .status.done { border-color: #a9ddc3; background: var(--green-soft); color: var(--green); }
+    .empty { padding: 42px; color: var(--muted); text-align: center; font-size: 13px; }
+    .add-row { display: flex; align-items: center; justify-content: center; min-height: 52px; border-top: 1px solid var(--line); background: #fbfcfa; }
+    .add-button { width: 31px; height: 31px; padding: 0; border: 1px solid #b9d7f3; border-radius: 50%; background: var(--blue-soft); color: var(--blue); font-size: 21px; line-height: 1; }
+
+    .modal-layer { position: fixed; inset: 0; z-index: 20; display: none; place-items: center; padding: 18px; background: rgba(24, 35, 42, .42); }
+    .modal-layer.open { display: grid; }
+    .modal { width: min(620px, 100%); max-height: min(720px, 92vh); overflow: auto; padding: 19px; border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: 0 22px 54px rgba(16, 27, 34, .24); }
+    .modal h2 { margin: 0 0 14px; font-size: 20px; }
+    .form-grid { display: grid; gap: 12px; }
+    .form-grid label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 800; }
+    .form-grid input, .form-grid select, .form-grid textarea { width: 100%; min-height: 34px; padding: 8px; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--ink); }
+    .form-grid textarea { min-height: 82px; resize: vertical; line-height: 1.45; }
+    .if-builder { display: grid; grid-template-columns: 1.25fr .65fr .8fr auto; gap: 6px; align-items: center; justify-content: start; }
+    .unit { min-width: 48px; color: var(--muted); font-size: 13px; font-weight: 760; }
+    .suggestion { margin-top: -5px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+    .toast { position: fixed; right: 22px; bottom: 20px; z-index: 30; display: none; max-width: 360px; padding: 11px 13px; border: 1px solid #9ed4b7; border-radius: 6px; background: var(--green-soft); color: var(--green); box-shadow: var(--shadow); font-size: 13px; font-weight: 760; }
+    .toast.show { display: block; }
+    .alert-popup { position: fixed; top: 50%; left: 50%; z-index: 25; display: none; width: min(370px, calc(100vw - 32px)); padding: 13px; border: 1px solid #b9d7f3; border-left: 4px solid var(--blue); border-radius: 7px; background: #fff; box-shadow: 0 18px 42px rgba(24, 35, 42, .18); transform: translate(-50%, -50%); }
+    .alert-popup.show { display: block; }
+    .alert-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .alert-title { font-size: 13px; font-weight: 850; }
+    .alert-condition, .alert-message { margin: 7px 0 0; font-size: 12px; line-height: 1.5; }
+    .alert-condition { color: var(--blue); font-weight: 760; }
+    .alert-message { color: #34404a; }
+    .alert-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 11px; }
+    @media (max-width: 760px) { .app { grid-template-columns: 1fr; } .rail { display: none; } .topbar { padding: 12px 16px; } .content { padding: 10px; } .if-builder { grid-template-columns: 1fr 1fr; } .if-builder span { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail">
+      <div class="brand"><span class="brand-mark">BSI</span><span>策略台</span></div>
+      <nav class="nav" aria-label="主导航"><button type="button">策略输入</button><button type="button">持仓分析</button><button class="active" type="button">AI 提醒</button><button type="button">AI 交易复盘</button><button type="button">我的</button></nav>
+    </aside>
+    <main>
+      <header class="topbar"><div><h1>AI 提醒</h1><p class="subline">管理你的 AI 提醒。</p></div></header>
+      <div class="content">
+        <div class="data-banner"><span>尚未接入行情数据。</span><button type="button" id="dataSetupButton">去接入</button></div>
+        <section class="workspace" aria-label="提醒列表">
+          <div class="table-tools"><input class="search" id="searchInput" placeholder="搜索创建时间、持仓、条件、文案或来源" /><select class="button" id="statusFilter" aria-label="筛选状态"><option value="all">全部状态</option><option value="pending">待处理</option><option value="done">已处理</option></select><span class="result-count" id="resultCount"></span></div>
+          <div class="table-wrap"><table><thead><tr><th><button class="sort-button" id="sortTime" type="button">创建时间 ↓</button></th><th>持仓</th><th>触发条件</th><th>提醒文案</th><th>来源</th><th>状态</th><th>操作</th></tr></thead><tbody id="tableBody"></tbody></table><div class="add-row"><button class="add-button" id="addButton" type="button" aria-label="新增提醒" title="新增提醒">+</button></div></div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <div class="modal-layer" id="modalLayer" aria-hidden="true"><div class="modal" id="modalContent"></div></div>
+  <aside class="alert-popup" id="alertPopup" role="alert" aria-live="assertive"><div class="alert-top"><span class="alert-title" id="alertHolding"></span><button class="icon-button" id="closeAlert" type="button" aria-label="关闭提醒" title="关闭提醒">×</button></div><div class="alert-condition" id="alertCondition"></div><p class="alert-message" id="alertMessage"></p><div class="alert-actions"><button class="button blue" id="readAlert" type="button">已读</button></div></aside>
+  <div class="toast" id="toast" role="status"></div>
+  <script>
+    const state = {
+      query: '',
+      descending: true,
+      statusFilter: 'all',
+      alertId: 'r1',
+      alertShown: false,
+      editingId: null,
+      pendingDelete: null,
+      reminders: [
+        { id: 'r1', date: '7/10/2026', dateKey: 20260710, holding: 'MSFT 7/31 415 Call', metric: '标的价格', operator: '≥', value: '419.5', unit: '美元', message: '股价已超过备兑看涨期权的提醒线，请注意上涨速度和原计划。', source: '计划动作：股价快速上涨时，复核是否接受正股被 Call 走或滚动。', status: 'pending', handled: false },
+        { id: 'r2', date: '7/10/2026', dateKey: 20260710, holding: 'NVDA 7/31 220 Put', metric: 'IV Percentile', operator: '≥', value: '90', unit: '%', message: '波动率处于高位，请注意卖出看跌期权收取权利金的机会。', source: '策略输入：当波动率暴涨、导致期权价格非常高时，考虑卖出 Put 收取权利金。', status: 'pending', handled: false, missing: true },
+        { id: 'r3', date: '7/9/2026', dateKey: 20260709, holding: 'MSFT 8/7 375 Put', metric: '标的价格', operator: '≤', value: '367', unit: '美元', message: 'Sell Put 接近平衡点，请注意当前价格与原计划。', source: '策略输入：卖出 375 Put，接近到期时根据价格与计划决定是否滚动。', status: 'paused', handled: true }
+      ]
+    };
+    const holdings = ['MSFT 7/31 415 Call', 'MSFT 8/7 375 Put', 'NVDA 7/24 210 Call', 'NVDA 7/31 220 Put', 'QQQM 正股'];
+    const suggestions = {
+      MSFT: ['计划动作：股价快速上涨时，复核是否接受正股被 Call 走或滚动。', '策略输入：轮子策略中通过 Covered Call 收取权利金并降低持仓成本。'],
+      NVDA: ['策略输入：当波动率暴涨、导致期权价格非常高时，考虑卖出 Put 收取权利金。', '计划动作：接受正股被 Call 走后释放资金，继续进行 Sell Put 布局。'],
+      QQQM: ['策略输入：按预设回撤区间分阶段买入，保持长期左侧布局。']
+    };
+    const metrics = ['标的价格', '期权价格', 'IV Percentile', 'IV Rank', 'IV', '距到期日', '财报前天数', '未实现盈亏百分比'];
+    const $ = (selector) => document.querySelector(selector);
+    const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+    const showToast = (message) => { const toast = $('#toast'); toast.textContent = message; toast.classList.add('show'); clearTimeout(showToast.timer); showToast.timer = setTimeout(() => toast.classList.remove('show'), 2600); };
+    const statusLabel = { pending: '待处理', enabled: '已启用', paused: '已暂停' };
+    const shortSource = (text) => text.length > 24 ? `${text.slice(0, 24)}…` : text;
+    const formatCondition = (item) => `${escapeHtml(item.metric)}${item.missing ? ' <span class="value-missing">--</span> ' : ' '}${escapeHtml(item.operator)} ${escapeHtml(item.value)} ${escapeHtml(item.unit)}`;
+
+    function filteredReminders() {
+      const query = state.query.trim().toLowerCase();
+      const items = state.reminders.filter((item) => {
+        const statusMatch = state.statusFilter === 'all' || (state.statusFilter === 'done' ? item.handled : !item.handled);
+        const textMatch = !query || `${item.date} ${item.holding} ${item.metric} ${item.operator} ${item.value} ${item.message} ${item.source} ${item.handled ? '已处理' : '待处理'}`.toLowerCase().includes(query);
+        return statusMatch && textMatch;
+      });
+      return items.sort((a, b) => state.descending ? b.dateKey - a.dateKey : a.dateKey - b.dateKey);
+    }
+    function actionButton(item, status, icon, label) { const blocked = item.missing && status === 'enabled'; return `<button type="button" class="state-button ${status} ${item.status === status ? `active ${status}` : ''}" data-status="${status}" data-id="${item.id}" aria-label="${blocked ? '缺少行情数据，无法启用' : label}" title="${blocked ? '缺少行情数据，无法启用' : label}" ${blocked ? 'disabled' : ''}>${icon}</button>`; }
+    function renderRow(item) {
+      const editing = state.editingId === item.id;
+      const message = editing
+        ? `<div class="message"><textarea id="message-${item.id}">${escapeHtml(item.message)}</textarea><div class="message-actions"><button class="icon-button" type="button" data-save-message="${item.id}" aria-label="保存" title="保存">✓</button><button class="icon-button" type="button" data-cancel-message="${item.id}" aria-label="取消" title="取消">×</button></div></div>`
+        : `<div class="message"><p>${escapeHtml(item.message)}</p><button class="icon-button" type="button" data-edit-message="${item.id}" aria-label="编辑提醒文案" title="编辑提醒文案">✎</button></div>`;
+      const status = item.handled ? '<span class="status done">已处理</span>' : '<span class="status">待处理</span>';
+      return `<tr><td>${item.date}</td><td><div class="holding">${escapeHtml(item.holding || '--')}</div></td><td><div class="condition"><span>${formatCondition(item)}</span><button class="icon-button" type="button" data-edit-condition="${item.id}" aria-label="编辑触发条件" title="编辑触发条件">✎</button></div></td><td>${message}</td><td><div class="source-cell"><span class="source-preview" tabindex="0" title="${escapeHtml(item.source)}">${escapeHtml(shortSource(item.source))}</span><span class="source-tooltip">${escapeHtml(item.source)}</span></div></td><td>${status}</td><td><div class="operation">${actionButton(item, 'enabled', '▶', '启用')}${actionButton(item, 'paused', 'Ⅱ', '暂停')}<button type="button" class="state-button delete" data-delete="${item.id}" aria-label="删除" title="删除">×</button></div></td></tr>`;
+    }
+    function render() {
+      const items = filteredReminders();
+      $('#tableBody').innerHTML = items.length ? items.map(renderRow).join('') : '<tr><td colspan="7"><div class="empty">没有匹配的提醒。</div></td></tr>';
+      $('#resultCount').textContent = `${items.length} 条`;
+      $('#sortTime').textContent = `创建时间 ${state.descending ? '↓' : '↑'}`;
+      bindTableEvents();
+      window.parent.postMessage({ type: 'bsi-pending-reminder', count: state.reminders.filter((item) => !item.handled).length }, '*');
+      window.parent.postMessage({ type: 'bsi-data-connection', connected: false }, '*');
+      if (!state.alertShown && state.alertId) { state.alertShown = true; window.setTimeout(() => showTriggeredAlert(state.reminders.find((item) => item.id === state.alertId)), 300); }
+    }
+    function bindTableEvents() {
+      document.querySelectorAll('[data-status]').forEach((button) => button.addEventListener('click', () => { const item = state.reminders.find((entry) => entry.id === button.dataset.id); if (!item) return; item.status = button.dataset.status; item.handled = true; state.editingId = null; render(); showToast(`已设为${statusLabel[item.status]}`); }));
+      document.querySelectorAll('[data-edit-message]').forEach((button) => button.addEventListener('click', () => { state.editingId = button.dataset.editMessage; render(); $(`#message-${state.editingId}`)?.focus(); }));
+      document.querySelectorAll('[data-cancel-message]').forEach((button) => button.addEventListener('click', () => { state.editingId = null; render(); }));
+      document.querySelectorAll('[data-save-message]').forEach((button) => button.addEventListener('click', () => { const item = state.reminders.find((entry) => entry.id === button.dataset.saveMessage); updateReminder(item, { message: $(`#message-${item.id}`).value.trim() || item.message }); state.editingId = null; render(); }));
+      document.querySelectorAll('[data-edit-condition]').forEach((button) => button.addEventListener('click', () => openConditionEditor(button.dataset.editCondition)));
+      document.querySelectorAll('[data-delete]').forEach((button) => button.addEventListener('click', () => confirmDelete(button.dataset.delete)));
+    }
+    function updateReminder(item, changes) {
+      if (item.status !== 'enabled') { Object.assign(item, changes); showToast('已保存提醒'); return; }
+      item.status = 'paused';
+      item.handled = true;
+      state.reminders.unshift({ ...item, ...changes, id: `r${Date.now()}`, date: '7/10/2026', dateKey: 20260710, status: 'pending', handled: false, missing: false });
+      showToast('已生成新的待处理版本，原提醒已暂停');
+    }
+    function showTriggeredAlert(item) {
+      if (!item) return;
+      $('#alertHolding').textContent = item.holding || 'AI 提醒';
+      $('#alertCondition').textContent = `${item.metric} ${item.operator} ${item.value} ${item.unit}`;
+      $('#alertMessage').textContent = item.message;
+      $('#alertPopup').classList.add('show');
+      state.alertId = item.id;
+    }
+    function closeTriggeredAlert(read) {
+      if (read) showToast('已标记为已读');
+      $('#alertPopup').classList.remove('show');
+    }
+    function openModal(html) { $('#modalContent').innerHTML = html; $('#modalLayer').classList.add('open'); $('#modalLayer').setAttribute('aria-hidden', 'false'); document.querySelectorAll('[data-close-modal]').forEach((button) => button.addEventListener('click', closeModal)); }
+    function closeModal() { $('#modalLayer').classList.remove('open'); $('#modalLayer').setAttribute('aria-hidden', 'true'); }
+    function confirmDelete(id) { const item = state.reminders.find((entry) => entry.id === id); openModal(`<h2>删除提醒</h2><p>删除后将从当前列表移除。</p><div class="modal-actions"><button class="button" type="button" data-close-modal>取消</button><button class="button danger" type="button" id="confirmDelete">删除</button></div>`); $('#confirmDelete').addEventListener('click', () => { state.reminders = state.reminders.filter((entry) => entry.id !== id); closeModal(); render(); showToast(`已删除 ${item.holding} 的提醒`); }); }
+    function metricUnit(metric) { if (metric === 'IV Percentile' || metric === 'IV Rank' || metric === 'IV' || metric === '未实现盈亏百分比') return '%'; if (metric === '距到期日' || metric === '财报前天数') return '天'; return '美元'; }
+    function suggestionOptions(holding) {
+      const symbol = holding.split(' ')[0];
+      const items = holding ? (suggestions[symbol] || []) : [];
+      return `<option value="">${holding ? '引用相关策略或计划' : '请先选择持仓'}</option>${items.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join('')}`;
+    }
+    function bindSuggestion() {
+      $('#newHolding').addEventListener('change', (event) => { const select = $('#newSuggestion'); select.innerHTML = suggestionOptions(event.target.value); select.disabled = !event.target.value; });
+      $('#newSuggestion').addEventListener('change', (event) => { if (event.target.value) $('#newMessage').value = event.target.value; });
+    }
+    function openConditionEditor(id) {
+      const item = state.reminders.find((entry) => entry.id === id);
+      openModal(`<h2>编辑触发条件</h2><div class="form-grid"><label>触发条件<div class="if-builder"><select id="editMetric">${metrics.map((metric) => `<option ${metric === item.metric ? 'selected' : ''}>${metric}</option>`).join('')}</select><select id="editOperator">${['≥', '≤', '='].map((operator) => `<option ${operator === item.operator ? 'selected' : ''}>${operator}</option>`).join('')}</select><input id="editValue" inputmode="decimal" value="${escapeHtml(item.value)}" /><span class="unit" id="editUnit">${escapeHtml(item.unit)}</span></div></label></div><div class="modal-actions"><button class="button" type="button" data-close-modal>取消</button><button class="button primary" type="button" id="saveCondition">保存</button></div>`);
+      $('#editMetric').addEventListener('change', (event) => { $('#editUnit').textContent = metricUnit(event.target.value); });
+      $('#saveCondition').addEventListener('click', () => { updateReminder(item, { metric: $('#editMetric').value, operator: $('#editOperator').value, value: $('#editValue').value.trim() || '--', unit: $('#editUnit').textContent, missing: false }); closeModal(); render(); });
+    }
+    function openAdd() {
+      openModal(`<h2>新增提醒</h2><div class="form-grid"><label>持仓<select id="newHolding">${holdings.map((holding) => `<option>${holding}</option>`).join('')}<option value="">不关联持仓</option></select></label><label>触发条件<div class="if-builder"><select id="newMetric">${metrics.map((metric) => `<option>${metric}</option>`).join('')}</select><select id="newOperator"><option>≥</option><option>≤</option><option>=</option></select><input id="newValue" inputmode="decimal" placeholder="数值" /><span class="unit" id="newUnit">美元</span></div></label><label>提醒文案<textarea id="newMessage" placeholder="请输入提醒文案"></textarea></label><label class="suggestion">相关策略或计划<select id="newSuggestion">${suggestionOptions(holdings[0])}</select></label></div><div class="modal-actions"><button class="button" type="button" data-close-modal>取消</button><button class="button primary" type="button" id="saveNew">新增</button></div>`);
+      $('#newMetric').addEventListener('change', (event) => { $('#newUnit').textContent = metricUnit(event.target.value); });
+      bindSuggestion();
+      $('#saveNew').addEventListener('click', () => { const metric = $('#newMetric').value; const suggestion = $('#newSuggestion').value; const reminder = { id: `r${Date.now()}`, date: '7/11/2026', dateKey: 20260711, holding: $('#newHolding').value, metric, operator: $('#newOperator').value, value: $('#newValue').value.trim() || '--', unit: $('#newUnit').textContent, message: $('#newMessage').value.trim() || '请注意此条件。', source: suggestion || '手动新增', status: 'pending', handled: false }; state.reminders.unshift(reminder); closeModal(); render(); showToast('已新增待处理提醒'); });
+    }
+    $('#searchInput').addEventListener('input', (event) => { state.query = event.target.value; render(); });
+    $('#sortTime').addEventListener('click', () => { state.descending = !state.descending; render(); });
+    $('#statusFilter').addEventListener('change', (event) => { state.statusFilter = event.target.value; render(); });
+    $('#addButton').addEventListener('click', openAdd);
+    $('#dataSetupButton').addEventListener('click', () => window.parent.postMessage({ type: 'bsi-open-data-settings' }, '*'));
+    $('#modalLayer').addEventListener('click', (event) => { if (event.target.id === 'modalLayer') closeModal(); });
+    $('#closeAlert').addEventListener('click', () => closeTriggeredAlert(false));
+    $('#readAlert').addEventListener('click', () => closeTriggeredAlert(true));
+    render();
+  </script>
+</body>
+</html>

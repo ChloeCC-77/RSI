@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BSI 持仓分析 v5 原型</title>
+  <script>
+    const pageParams = new URLSearchParams(window.location.search);
+    if (pageParams.get("embed") === "1") {
+      document.documentElement.classList.add("embed");
+    } else window.location.replace("BSI_APP_PROTOTYPE_v5.html?tab=position");
+  </script>
+  <style>
+    :root {
+      --ink: #242d35;
+      --muted: #68747d;
+      --canvas: #f4f6f3;
+      --panel: #ffffff;
+      --panel-soft: #fafbf9;
+      --line: #d9dfd9;
+      --line-strong: #aeb9b0;
+      --nav: #26343e;
+      --blue: #2164a7;
+      --blue-soft: #eaf3ff;
+      --green: #197657;
+      --green-soft: #e9f7ef;
+      --amber: #9a6b22;
+      --amber-soft: #fff5dd;
+      --red: #ad4a47;
+      --red-soft: #fff0ef;
+      --shadow: 0 10px 30px rgba(34, 49, 57, 0.08);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; overflow: hidden; color: var(--ink); background: var(--canvas); }
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid rgba(33, 100, 167, 0.25); outline-offset: 2px; }
+
+    .app { height: 100vh; display: grid; grid-template-columns: 176px minmax(0, 1fr); }
+    .rail { display: grid; grid-template-rows: auto 1fr; gap: 26px; padding: 18px 12px; border-right: 1px solid var(--line); background: #fbfcfa; }
+    .brand { display: flex; align-items: center; gap: 9px; padding: 2px 4px; font-size: 20px; font-weight: 800; line-height: 1.05; }
+    .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; border: 2px solid var(--nav); border-radius: 6px; background: var(--amber-soft); font-size: 12px; }
+    .nav { display: grid; align-content: start; gap: 7px; }
+    .nav button { min-height: 43px; padding: 10px 11px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #8c969b; text-align: left; font-weight: 720; }
+    .nav button.active { border-color: var(--nav); background: var(--nav); color: #fff; }
+    .nav button:not(.active) { cursor: default; }
+
+    html.embed .rail { display: none; }
+    html.embed .app { grid-template-columns: minmax(0, 1fr); }
+
+    main { min-width: 0; display: grid; grid-template-rows: 82px minmax(0, 1fr); }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 24px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.78); }
+    h1 { margin: 0; font-size: 28px; letter-spacing: 0; }
+    .subline { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    .top-actions { display: flex; align-items: center; gap: 9px; }
+    .data-note { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .button { min-height: 32px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); font-size: 13px; font-weight: 760; white-space: nowrap; }
+    .button:hover { border-color: var(--line-strong); }
+    .button.primary { border-color: var(--nav); background: var(--nav); color: #fff; }
+    .button.blue { border-color: #b9d7f3; background: var(--blue-soft); color: var(--blue); }
+    .button.danger { border-color: #efc3c0; background: var(--red-soft); color: var(--red); }
+    .button:disabled { cursor: not-allowed; opacity: .48; }
+
+    .content { min-height: 0; display: grid; grid-template-rows: 112px minmax(0, 1fr); gap: 12px; padding: 14px 18px 18px; overflow: hidden; }
+    .overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; min-height: 0; }
+    .overview-card { min-width: 0; padding: 13px 15px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); box-shadow: var(--shadow); }
+    .overview-top, .overview-data { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .ticker { font-size: 18px; font-weight: 850; }
+    .direction { font-size: 12px; font-weight: 800; color: var(--green); }
+    .direction.neutral { color: var(--muted); }
+    .exposure { margin: 6px 0 7px; font-size: 17px; font-weight: 850; font-variant-numeric: tabular-nums; }
+    .exposure small { color: var(--muted); font-size: 11px; font-weight: 650; }
+    .overview-data { padding-top: 7px; border-top: 1px dashed #dce2dd; color: var(--muted); font-size: 12px; }
+    .overview-data strong { color: var(--ink); font-size: 12px; }
+
+    .workbench { min-height: 0; display: grid; grid-template-columns: minmax(420px, 1.38fr) minmax(245px, .78fr) minmax(265px, .86fr) minmax(185px, .58fr); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); box-shadow: var(--shadow); }
+    .pane { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .pane:last-child { border-right: 0; background: var(--panel-soft); }
+    .pane-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 58px; padding: 11px 13px; border-bottom: 1px solid var(--line); background: rgba(250,251,249,.9); }
+    .pane-title { margin: 0; font-size: 16px; }
+    .holdings-pane .pane-head { min-height: 62px; background: #f7fbff; }
+    .holdings-pane .pane-title { font-size: 18px; }
+    .pane-body { min-height: 0; overflow: auto; padding: 11px 12px; }
+    .search-row { display: flex; gap: 7px; margin-bottom: 10px; }
+    .search { min-width: 0; flex: 1; height: 32px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--ink); font-size: 12px; }
+
+    .tree { display: grid; gap: 9px; }
+    .holding-head, .tree-row { display: grid; grid-template-columns: minmax(120px, 1.35fr) .62fr .62fr .42fr .75fr .45fr .55fr; align-items: center; column-gap: 7px; }
+    .holding-head { padding: 0 8px; color: var(--muted); font-size: 10px; font-weight: 800; }
+    .holding-head span:not(:first-child), .holding-value { text-align: right; font-variant-numeric: tabular-nums; }
+    .tree-block { overflow: hidden; border: 1px solid #dde4df; border-radius: 6px; background: #fff; }
+    .tree-block.open { border-color: #cbd7d1; }
+    .tree-row { width: 100%; padding: 8px 9px; border: 0; border-left: 3px solid transparent; background: #fff; color: var(--ink); text-align: left; }
+    .tree-row:hover { background: #fafcfa; }
+    .tree-row.selected { border-left-color: var(--blue); background: var(--blue-soft); }
+    .tree-row.group { min-height: 46px; border-left-color: #8aa4b4; background: #fff; }
+    .tree-row.group:hover { background: #f4f8fa; }
+    .tree-row.group.selected { border-left-color: var(--blue); background: var(--blue-soft); }
+    .tree-row.group .row-main { grid-column: 1 / 7; }
+    .tree-row.child { padding-left: 34px; border-top: 1px solid #edf0ed; background: #fcfdfc; }
+    .tree-row.child.selected { background: var(--blue-soft); }
+    .tree-row.ungrouped { border-left-color: #c5cec9; }
+    .tree-row.drag-over { outline: 2px solid #70a7dd; outline-offset: -2px; }
+    .row-main { min-width: 0; }
+    .folder-mark { position: relative; display: inline-block; width: 14px; height: 10px; margin: 0 7px 0 1px; border: 1px solid #6e8795; border-radius: 2px; background: #f5f8f9; vertical-align: -1px; }
+    .folder-mark::before { content: ""; position: absolute; top: -4px; left: 1px; width: 6px; height: 3px; border: 1px solid #6e8795; border-bottom: 0; border-radius: 2px 2px 0 0; background: #f5f8f9; }
+    .tree-row.group.selected .folder-mark, .tree-row.group.selected .folder-mark::before { border-color: var(--blue); background: #fff; }
+    .folder-toggle { display: inline-block; width: 10px; color: var(--muted); font-size: 13px; font-weight: 800; vertical-align: -1px; }
+    .row-name { overflow: hidden; font-size: 11px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+    .row-sub { overflow: hidden; margin-top: 2px; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .row-number, .holding-value { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .status-tag { display: inline-flex; align-items: center; min-height: 21px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--muted); font-size: 10px; font-weight: 800; white-space: nowrap; }
+    .status-tag.blue { border-color: #b9d7f3; background: var(--blue-soft); color: var(--blue); }
+    .status-tag.amber { border-color: #ecd39d; background: var(--amber-soft); color: var(--amber); }
+    .status-tag.green { border-color: #a9ddc3; background: var(--green-soft); color: var(--green); }
+    .drop-area { min-height: 70px; margin-top: 13px; padding: 12px; border: 1px dashed #b8c6bb; border-radius: 6px; color: var(--muted); background: #f8fbf8; font-size: 12px; line-height: 1.45; display: flex; align-items: center; }
+    .drop-area.drag-over { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); }
+
+    .source-select { display: none; width: 100%; height: 32px; margin-bottom: 8px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--ink); font-size: 12px; }
+    .source-select.visible { display: block; }
+    .editor-card { position: relative; margin: 0; padding: 0; border: 0; background: transparent; }
+    .editor-read { width: 100%; min-height: 176px; height: clamp(176px, 42vh, 420px); overflow: auto; padding: 10px 43px 10px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); text-align: left; font-size: 13px; line-height: 1.58; }
+    .editor-pencil { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--blue); font-size: 15px; }
+    .editor-pencil:hover { border-color: #9bbde0; background: var(--blue-soft); }
+    .editor-empty { color: var(--muted); }
+    .editor-textarea { width: 100%; min-height: 176px; height: clamp(176px, 38vh, 360px); resize: none; padding: 10px; border: 1px solid #78a9d8; border-radius: 6px; background: #fff; color: var(--ink); font-size: 13px; line-height: 1.58; }
+    .editor-textarea:focus { outline: 0; box-shadow: 0 0 0 3px rgba(33, 100, 167, .12); }
+    .editor-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 9px; }
+    .pending-note { margin-top: 8px; padding: 8px; border: 1px solid #ecd39d; border-radius: 6px; background: var(--amber-soft); color: var(--amber); font-size: 12px; line-height: 1.45; }
+
+    .filter-menu { position: relative; }
+    .filter-menu summary { list-style: none; }
+    .filter-menu summary::-webkit-details-marker { display: none; }
+    .filter-menu summary { padding: 5px 7px; border: 1px solid var(--line); border-radius: 5px; color: var(--muted); font-size: 11px; font-weight: 800; cursor: pointer; }
+    .filter-menu[open] .filter-options { display: grid; }
+    .filter-options { position: absolute; top: 34px; right: 0; z-index: 4; display: none; width: 116px; gap: 2px; padding: 5px; border: 1px solid var(--line); border-radius: 6px; background: #fff; box-shadow: var(--shadow); }
+    .filter-options button { padding: 6px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); text-align: left; font-size: 11px; font-weight: 700; }
+    .filter-options button:hover, .filter-options button.active { background: var(--blue-soft); color: var(--blue); }
+    .history-list { display: grid; gap: 8px; }
+    .history-card { width: 100%; padding: 9px; border: 1px solid var(--line); border-left: 3px solid var(--blue); border-radius: 5px; background: #fff; color: var(--ink); text-align: left; }
+    .history-card:hover { border-color: var(--line-strong); }
+    .history-card.passive { border-left-color: var(--amber); }
+    .history-card.plan { border-left-color: var(--green); }
+    .history-time { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+    .history-title { margin-top: 4px; font-size: 11px; font-weight: 850; line-height: 1.4; }
+    .history-summary { margin-top: 5px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+
+    .modal-layer { position: fixed; inset: 0; z-index: 20; display: none; place-items: center; padding: 18px; background: rgba(24, 35, 42, .42); }
+    .modal-layer.open { display: grid; }
+    .modal { width: min(520px, 100%); max-height: min(680px, 92vh); overflow: auto; padding: 19px; border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: 0 22px 54px rgba(16, 27, 34, .24); }
+    .modal h2 { margin: 0 0 7px; font-size: 20px; }
+    .modal p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .transition-box { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin: 15px 0; }
+    .transition-state { min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-soft); font-size: 12px; font-weight: 800; line-height: 1.45; }
+    .transition-arrow { color: var(--muted); font-size: 20px; }
+    .modal label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 12px; font-weight: 800; }
+    .modal input, .modal textarea { width: 100%; padding: 9px; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--ink); }
+    .modal textarea { min-height: 78px; resize: vertical; line-height: 1.5; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 15px; }
+    .detail-grid { display: grid; gap: 10px; margin-top: 14px; }
+    .detail-block { padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-soft); }
+    .detail-block strong { display: block; margin-bottom: 4px; font-size: 12px; }
+    .detail-block span { color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .toast { position: fixed; right: 22px; bottom: 20px; z-index: 30; display: none; max-width: 360px; padding: 11px 13px; border: 1px solid #9ed4b7; border-radius: 6px; background: var(--green-soft); color: var(--green); box-shadow: var(--shadow); font-size: 13px; font-weight: 760; }
+    .toast.show { display: block; }
+
+    @media (max-width: 1260px) {
+      .app { grid-template-columns: 150px minmax(0, 1fr); }
+      .workbench { grid-template-columns: minmax(300px, 1.05fr) minmax(230px, .85fr) minmax(260px, .95fr); }
+      .history-pane { grid-column: 1 / -1; max-height: 186px; border-top: 1px solid var(--line); }
+      .history-pane .pane-body { display: grid; grid-template-columns: 155px minmax(0, 1fr); gap: 10px; }
+      .history-filter { align-content: start; margin: 0; }
+      .history-list { grid-auto-flow: column; grid-auto-columns: 180px; overflow-x: auto; }
+    }
+
+    @media (max-width: 920px) {
+      body { overflow: auto; }
+      .app { min-height: 100vh; height: auto; grid-template-columns: 1fr; }
+      .rail { grid-template-columns: auto 1fr; grid-template-rows: auto; align-items: center; padding: 11px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .nav { display: flex; gap: 4px; overflow-x: auto; }
+      .nav button { min-height: 36px; white-space: nowrap; }
+      main { min-height: calc(100vh - 58px); height: auto; }
+      .content { grid-template-rows: auto auto; overflow: visible; }
+      .overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .workbench { grid-template-columns: 1fr; overflow: visible; }
+      .pane { min-height: 360px; border-right: 0; border-top: 1px solid var(--line); }
+      .pane:first-child { border-top: 0; }
+      .history-pane { grid-column: auto; max-height: none; }
+      .history-pane .pane-body { display: block; }
+      .history-list { grid-auto-flow: row; grid-auto-columns: auto; overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail">
+      <div class="brand"><span class="brand-mark">BSI</span><span>策略台</span></div>
+      <nav class="nav" aria-label="主导航">
+        <button type="button">策略输入</button>
+        <button type="button" class="active">持仓分析</button>
+        <button type="button">AI 提醒</button>
+        <button type="button">AI 交易复盘</button>
+        <button type="button">我的</button>
+      </nav>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div><h1>持仓分析</h1><p class="subline">管理持仓组合，更新当前计划。</p></div>
+        <div class="top-actions"><span class="data-note">IBKR 数据延迟约 15 分钟</span><button class="button blue" type="button" id="refreshButton">刷新持仓</button></div>
+      </header>
+
+      <div class="content">
+        <section class="overview" aria-label="持仓整体组成">
+          <article class="overview-card"><div class="overview-top"><span class="ticker">MSFT</span><span class="direction">看涨</span></div><div class="exposure">+109 <small>持仓暴露</small></div><div class="overview-data"><span>1.1 倍看涨</span><strong>100 股 · 2 条期权</strong></div></article>
+          <article class="overview-card"><div class="overview-top"><span class="ticker">NVDA</span><span class="direction">看涨</span></div><div class="exposure">+144 <small>持仓暴露</small></div><div class="overview-data"><span>1.4 倍看涨</span><strong>100 股 · 2 条期权</strong></div></article>
+          <article class="overview-card"><div class="overview-top"><span class="ticker">QQQM</span><span class="direction">看涨</span></div><div class="exposure">+30 <small>持仓暴露</small></div><div class="overview-data"><span>0.3 倍看涨</span><strong>30 股</strong></div></article>
+          <article class="overview-card"><div class="overview-top"><span class="ticker">0700</span><span class="direction neutral">持有中</span></div><div class="exposure">-- <small>持仓暴露</small></div><div class="overview-data"><span>等待更新</span><strong>正股</strong></div></article>
+        </section>
+
+        <section class="workbench" aria-label="持仓计划工作区">
+          <section class="pane holdings-pane">
+            <header class="pane-head"><h2 class="pane-title">持仓与组合</h2><button class="button" type="button" id="createGroupButton">新建组合</button></header>
+            <div class="pane-body">
+              <div class="search-row"><input class="search" id="holdingSearch" placeholder="搜索标的、合约或组合" /></div>
+              <div class="tree" id="holdingTree"></div>
+              <div class="drop-area" id="ungroupedDrop">拖到这里，移出组合并建立独立计划</div>
+            </div>
+          </section>
+
+          <section class="pane">
+            <header class="pane-head"><h2 class="pane-title">开仓逻辑</h2></header>
+            <div class="pane-body" id="logicPane"></div>
+          </section>
+
+          <section class="pane">
+            <header class="pane-head"><h2 class="pane-title">计划动作</h2></header>
+            <div class="pane-body" id="actionPane"></div>
+          </section>
+
+          <aside class="pane history-pane">
+            <header class="pane-head"><h2 class="pane-title">历史</h2><details class="filter-menu"><summary>筛选</summary><div class="filter-options" id="historyFilter"><button type="button" class="active" data-filter="全部">全部</button><button type="button" data-filter="策略转场">策略转场</button><button type="button" data-filter="持仓变更">持仓变更</button><button type="button" data-filter="计划与提醒">计划与提醒</button></div></details></header>
+            <div class="pane-body">
+              <div class="history-list" id="historyList"></div>
+            </div>
+          </aside>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-layer" id="modalLayer" aria-hidden="true"><div class="modal" id="modalContent"></div></div>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+    const state = {
+      selectedId: 'group-msft',
+      editingField: null,
+      search: '',
+      filter: '全部',
+      expanded: new Set(['group-msft']),
+      pending: null,
+      objects: {
+        'group-msft': {
+          id: 'group-msft', type: 'group', name: 'MSFT 备兑看涨期权', symbol: 'MSFT', exposure: '+70', status: '',
+          children: ['stock-msft', 'call-msft'], source: '策略输入 · MSFT 轮动策略',
+          logic: '卖出 Put 被行权后持有 100 股 MSFT，通过 Covered Call 收取权利金并降低持仓成本。',
+          action: '若股价快速明显高于 415，复核是否接受正股被 Call 走，或选择滚动、买回平仓。'
+        },
+        'stock-msft': { id: 'stock-msft', type: 'holding', name: 'MSFT', contract: '正股', symbol: 'MSFT', quantity: '100', avg: '404.00', last: '416.40', pnl: '+1,100', delta: '1.00', exposure: '+100', parent: 'group-msft', logic: '', action: '' },
+        'call-msft': { id: 'call-msft', type: 'holding', name: 'MSFT', contract: '07-31 415 看涨期权', symbol: 'MSFT', quantity: '-1', avg: '4.49', last: '7.07', pnl: '-264', delta: '+0.30', exposure: '-30', parent: 'group-msft', logic: '', action: '' },
+        'put-msft': { id: 'put-msft', type: 'holding', name: 'MSFT', contract: '08-07 375 看跌期权', symbol: 'MSFT', quantity: '-1', avg: '29.54', last: '13.40', pnl: '+1,597', delta: '-0.39', exposure: '+39', parent: null, logic: '', action: '' },
+        'group-nvda': { id: 'group-nvda', type: 'group', name: 'NVDA 现金释放计划', symbol: 'NVDA', exposure: '+144', status: '', children: ['stock-nvda', 'call-nvda', 'put-nvda'], source: '策略输入 · NVDA 策略更新', logic: '持有 100 股 NVDA，并通过卖出 Covered Call 与 Sell Put 管理现有仓位和现金使用。', action: '接受正股被 210 Call 走以释放现金；根据波动率再评估 220 Put 是否滚动或继续持有。' },
+        'stock-nvda': { id: 'stock-nvda', type: 'holding', name: 'NVDA', contract: '正股', symbol: 'NVDA', quantity: '100', avg: '208.98', last: '201.48', pnl: '-750', delta: '1.00', exposure: '+100', parent: 'group-nvda', logic: '', action: '' },
+        'call-nvda': { id: 'call-nvda', type: 'holding', name: 'NVDA', contract: '07-24 210 看涨期权', symbol: 'NVDA', quantity: '-1', avg: '3.49', last: '3.55', pnl: '-12', delta: '+0.35', exposure: '-35', parent: 'group-nvda', logic: '', action: '' },
+        'put-nvda': { id: 'put-nvda', type: 'holding', name: 'NVDA', contract: '07-31 220 看跌期权', symbol: 'NVDA', quantity: '-1', avg: '21.34', last: '19.11', pnl: '+229', delta: '-0.79', exposure: '+79', parent: 'group-nvda', logic: '', action: '' },
+        'qqqm': { id: 'qqqm', type: 'holding', name: 'QQQM', contract: '正股', symbol: 'QQQM', quantity: '30', avg: '293.07', last: '296.51', pnl: '+103', delta: '1.00', exposure: '+30', parent: null, logic: '', action: '' }
+      },
+      groupOrder: ['group-msft', 'group-nvda'],
+      ungrouped: ['put-msft', 'qqqm'],
+      history: [
+        { id: 'h1', scope: 'group-msft', type: '持仓变更', kind: '创建组合', time: '07-18 14:05', title: '建立 MSFT 备兑看涨期权', summary: '100 股 MSFT 与卖出看涨期权形成组合。', detail: ['持仓变化：100 股 MSFT + 卖出 1 手 415 看涨期权', '逻辑变化：原单条逻辑被组合承接', '计划变化：建立组合计划', '提醒变化：相关提醒等待处理'] },
+        { id: 'h2', scope: 'group-msft', type: '计划与提醒', kind: '计划已更新', time: '07-18 14:09', title: '保存组合计划动作', summary: '新增快速上涨、到期日和财报窗口的复核条件。', detail: ['持仓变化：无', '逻辑变化：无', '计划变化：组合计划已保存', '提醒变化：条件已提交至 AI 提醒'] },
+        { id: 'h3', scope: 'group-nvda', type: '计划与提醒', kind: '计划已更新', time: '07-09 16:35', title: '更新 NVDA 资金释放计划', summary: '组合计划改为接受正股被卖出。', detail: ['持仓变化：无', '逻辑变化：保留核心判断', '计划变化：更新退出安排', '提醒变化：重新提交相关条件'] }
+      ]
+    };
+
+    const getObject = (id) => state.objects[id];
+    const selectedScope = () => {
+      const current = getObject(state.selectedId);
+      return current?.parent ? getObject(current.parent) : current;
+    };
+    const escapeHtml = (value = '') => value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => toast.classList.remove('show'), 2800);
+    }
+
+    function setSelected(id) {
+      state.selectedId = id;
+      state.editingField = null;
+      renderAll();
+    }
+
+    function matching(object) {
+      const q = state.search.trim().toLowerCase();
+      return !q || `${object.name} ${object.contract || ''} ${object.symbol}`.toLowerCase().includes(q);
+    }
+
+    function groupExposure(group) {
+      const values = group.children
+        .map((id) => Number(String(getObject(id)?.exposure || '').replace(/[^0-9.-]/g, '')))
+        .filter((value) => Number.isFinite(value));
+      if (!values.length) return '--';
+      const total = values.reduce((sum, value) => sum + value, 0);
+      return total > 0 ? `+${total}` : `${total}`;
+    }
+
+    function renderHolding(id, isChild = false) {
+      const item = getObject(id);
+      if (!item || !matching(item)) return '';
+      const selected = state.selectedId === id ? 'selected' : '';
+      const groupClass = isChild ? 'child' : 'ungrouped';
+      return `<button type="button" draggable="true" class="tree-row ${groupClass} ${selected}" data-select="${id}" data-drag="${id}">
+        <span class="row-main"><span class="row-name">${escapeHtml(item.name)}</span><span class="row-sub">${escapeHtml(item.contract || '')}</span></span>
+        <span class="holding-value">${escapeHtml(item.avg || '--')}</span>
+        <span class="holding-value">${escapeHtml(item.last || '--')}</span>
+        <span class="holding-value">${escapeHtml(item.quantity || '--')}</span>
+        <span class="holding-value">${escapeHtml(item.pnl || '--')}</span>
+        <span class="holding-value">${escapeHtml(item.delta || '--')}</span>
+        <span class="holding-value">${escapeHtml(item.exposure || '--')}</span>
+      </button>`;
+    }
+
+    function renderGroup(id) {
+      const group = getObject(id);
+      if (!group) return '';
+      const childHtml = group.children.map((child) => renderHolding(child, true)).join('');
+      const visible = matching(group) || childHtml;
+      if (!visible) return '';
+      const open = state.expanded.has(id);
+      const selected = state.selectedId === id ? 'selected' : '';
+      const exposure = groupExposure(group);
+      const tag = group.status ? `<span class="status-tag ${group.status === '待确认' ? 'amber' : 'blue'}">${group.status}</span>` : `<span class="row-number">${exposure}</span>`;
+      return `<div class="tree-block ${open ? 'open' : ''}">
+        <button type="button" class="tree-row group ${selected}" data-select="${id}" data-toggle="${id}" data-drop-group="${id}">
+          <span class="row-main"><span class="folder-toggle" aria-hidden="true">${open ? '⌄' : '›'}</span><span class="folder-mark" aria-hidden="true"></span><span class="row-name">${escapeHtml(group.name)}</span><span class="row-sub">组合 · 持仓暴露 ${exposure} · ${group.children.length} 条持仓</span></span>${tag}
+        </button>
+        ${open ? childHtml : ''}
+      </div>`;
+    }
+
+    function renderTree() {
+      const groupHtml = state.groupOrder.map(renderGroup).join('');
+      const ungrouped = state.ungrouped.map((id) => renderHolding(id)).join('');
+      document.getElementById('holdingTree').innerHTML = `<div class="holding-head"><span>投资产品</span><span>平均价格</span><span>最后</span><span>持仓</span><span>未实现盈亏</span><span>Delta</span><span>暴露</span></div>${groupHtml}${ungrouped || '<div class="drop-area">暂无未分组持仓</div>'}`;
+      bindTreeEvents();
+    }
+
+    function sourceOptions(scope, field, visible) {
+      const base = scope.symbol === 'NVDA'
+        ? ['NVDA 资金释放与策略更新', '期权滚动规则', '快速上涨风险标签']
+        : scope.symbol === 'QQQM'
+          ? ['QQQM 长期左侧买入计划', '长期布局规则']
+          : ['MSFT 轮动策略与备兑看涨期权', '退出止盈与滚动规则', '财报前波动风险标签'];
+      return `<select class="source-select ${visible ? 'visible' : ''}" data-source-field="${field}"><option value="">引用策略输入中的规则</option>${base.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join('')}</select>`;
+    }
+
+    function renderEditor(field) {
+      const scope = selectedScope();
+      if (!scope) return '<div class="pending-note">请选择一条持仓或组合。</div>';
+      const value = scope[field] || '';
+      const isEditing = state.editingField === field;
+      const isDraft = scope.draft;
+      const draftNote = isDraft ? '<div class="pending-note">该持仓刚从组合移出。请补充独立计划后再生成提醒。</div>' : '';
+      if (!isEditing) return `<article class="editor-card"><div class="editor-read">${value ? escapeHtml(value) : '<span class="editor-empty">尚未填写</span>'}</div><button class="editor-pencil" type="button" data-edit-field="${field}" title="编辑">✎</button></article>${draftNote}`;
+      return `${sourceOptions(scope, field, true)}<article class="editor-card"><textarea class="editor-textarea" id="${field}Input" placeholder="">${escapeHtml(value)}</textarea><div class="editor-actions"><button class="button" type="button" data-cancel-field="${field}">取消</button><button class="button primary" type="button" data-save-field="${field}">保存</button></div></article>${draftNote}`;
+    }
+
+    function renderEditors() {
+      document.getElementById('logicPane').innerHTML = renderEditor('logic');
+      document.getElementById('actionPane').innerHTML = renderEditor('action');
+      bindEditorEvents();
+    }
+
+    function historyForScope() {
+      const scope = selectedScope();
+      const current = state.history.filter((event) => !scope || event.scope === scope.id);
+      return state.filter === '全部' ? current : current.filter((event) => event.type === state.filter);
+    }
+
+    function renderHistory() {
+      const events = historyForScope();
+      document.getElementById('historyList').innerHTML = events.length ? events.map((event) => {
+        const className = event.type === '持仓变更' ? 'passive' : event.type === '计划与提醒' ? 'plan' : '';
+        return `<button type="button" class="history-card ${className}" data-history="${event.id}"><span class="history-time">${event.time}</span><span class="history-title">${event.kind}</span><span class="history-summary">${event.summary}</span></button>`;
+      }).join('') : '<div class="drop-area">暂无相关历史</div>';
+      document.querySelectorAll('[data-history]').forEach((button) => button.addEventListener('click', () => openHistory(button.dataset.history)));
+    }
+
+    function renderAll() { renderTree(); renderEditors(); renderHistory(); }
+
+    function bindTreeEvents() {
+      document.querySelectorAll('[data-select]').forEach((row) => row.addEventListener('click', (event) => {
+        const id = event.currentTarget.dataset.select;
+        if (event.currentTarget.dataset.toggle) state.expanded.has(id) ? state.expanded.delete(id) : state.expanded.add(id);
+        setSelected(id);
+      }));
+      document.querySelectorAll('[data-drag]').forEach((row) => {
+        row.addEventListener('dragstart', (event) => { event.dataTransfer.setData('text/plain', row.dataset.drag); event.dataTransfer.effectAllowed = 'move'; });
+      });
+      document.querySelectorAll('[data-drop-group]').forEach((row) => bindDropTarget(row, (itemId) => startTransition('merge', itemId, row.dataset.dropGroup)));
+      bindDropTarget(document.getElementById('ungroupedDrop'), (itemId) => startTransition('split', itemId));
+    }
+
+    function bindDropTarget(target, callback) {
+      target.addEventListener('dragover', (event) => { event.preventDefault(); target.classList.add('drag-over'); });
+      target.addEventListener('dragleave', () => target.classList.remove('drag-over'));
+      target.addEventListener('drop', (event) => { event.preventDefault(); target.classList.remove('drag-over'); callback(event.dataTransfer.getData('text/plain')); });
+    }
+
+    function bindEditorEvents() {
+      document.querySelectorAll('[data-edit-field]').forEach((button) => button.addEventListener('click', () => {
+        state.editingField = button.dataset.editField;
+        renderEditors();
+        document.getElementById(`${state.editingField}Input`)?.focus();
+      }));
+      document.querySelectorAll('[data-cancel-field]').forEach((button) => button.addEventListener('click', () => {
+        state.editingField = null;
+        renderEditors();
+      }));
+      document.querySelectorAll('[data-save-field]').forEach((button) => button.addEventListener('click', () => {
+        const field = button.dataset.saveField;
+        const scope = selectedScope();
+        const nextValue = document.getElementById(`${field}Input`).value.trim();
+        if (nextValue === scope[field]) {
+          state.editingField = null;
+          renderEditors();
+          showToast('没有需要保存的修改');
+          return;
+        }
+        scope[field] = nextValue;
+        scope.draft = false;
+        state.editingField = null;
+        state.history.unshift({ id: `h${Date.now()}`, scope: scope.id, type: '计划与提醒', kind: `${field === 'logic' ? '开仓逻辑' : '计划动作'}已保存`, time: '刚刚', title: '计划已更新', summary: field === 'logic' ? '已更新开仓逻辑。' : '已提交至 AI 提醒等待确认。', detail: ['持仓变化：无', '逻辑变化：用户已保存内容', `计划变化：${field === 'action' ? '已更新并提交提醒条件' : '无'}`, '提醒变化：等待 AI 提醒确认'] });
+        renderAll();
+        if (field === 'action') window.parent.postMessage({ type: 'bsi-pending-reminder', count: 1 }, '*');
+        showToast(field === 'logic' ? '已保存开仓逻辑' : '计划已提交至 AI 提醒');
+      }));
+      document.querySelectorAll('[data-source-field]').forEach((select) => select.addEventListener('change', (event) => {
+        if (!event.target.value) return;
+        const field = event.target.dataset.sourceField;
+        const rules = {
+          'MSFT 轮动策略与备兑看涨期权': '通过卖出看涨期权收取权利金，并接受正股可能在约定价格被行权。',
+          '退出止盈与滚动规则': '在到期前或快速上涨时，复核是否滚动或买回平仓。',
+          '财报前波动风险标签': '财报前 1 至 1.5 周结合 IV Rank 复核是否提前处理。',
+          'NVDA 资金释放与策略更新': '接受正股可能被卖出，以释放现金并继续进行卖出看跌期权布局。',
+          '期权滚动规则': '临近到期日时复核是否滚动至新的到期日和行权价。',
+          '快速上涨风险标签': '标的快速上涨时，复核上行受限和被行权风险。',
+          'QQQM 长期左侧买入计划': '按预设回撤区间分阶段买入，避免一次性投入。',
+          '长期布局规则': '保持长期配置，按计划复核下一阶段仓位。'
+        };
+        const rule = rules[event.target.value] || event.target.value;
+        showToast('已加入编辑框，可继续修改');
+        const input = document.getElementById(`${field}Input`);
+        input.value = input.value ? `${input.value}\n\n${rule}` : rule;
+      }));
+    }
+
+    function startTransition(kind, itemId, targetId = null) {
+      const item = getObject(itemId);
+      const target = targetId ? getObject(targetId) : null;
+      if (!item || item.type !== 'holding') return;
+      if (kind === 'merge' && item.parent === targetId) return;
+      if (kind === 'split' && !item.parent) { showToast('该持仓已是未分组状态'); return; }
+      state.pending = { kind, itemId, targetId };
+      const before = item.parent ? getObject(item.parent).name : '未分组持仓';
+      const after = kind === 'merge' ? target.name : '独立计划草稿';
+      openModal(`<h2>确认持仓调整</h2><p>本次调整会保留原计划和历史来源，并暂缓受影响的提醒。</p>
+        <div class="transition-box"><div class="transition-state">${escapeHtml(before)}</div><div class="transition-arrow">→</div><div class="transition-state">${escapeHtml(after)}</div></div>
+        <label for="transitionReason">这次调整的原因（可选）</label><textarea id="transitionReason" placeholder="例如：希望单独处理这条期权"></textarea>
+        <div class="modal-actions"><button class="button" type="button" data-close-modal>取消</button><button class="button primary" type="button" data-commit-transition>${kind === 'merge' ? '建立组合计划' : '建立独立计划'}</button></div>`);
+    }
+
+    function commitTransition() {
+      const { kind, itemId, targetId } = state.pending;
+      const item = getObject(itemId);
+      const oldParent = item.parent ? getObject(item.parent) : null;
+      const reason = document.getElementById('transitionReason')?.value.trim();
+      if (oldParent) oldParent.children = oldParent.children.filter((id) => id !== itemId);
+      state.ungrouped = state.ungrouped.filter((id) => id !== itemId);
+      if (kind === 'merge') {
+        const target = getObject(targetId);
+        target.children.push(itemId);
+        item.parent = targetId;
+        target.status = '待更新';
+        state.selectedId = targetId;
+        state.history.unshift({ id: `h${Date.now()}`, scope: targetId, type: '持仓变更', kind: '持仓加入组合', time: '刚刚', title: '持仓加入组合', summary: `${item.name} 已加入 ${target.name}。`, detail: [`持仓变化：${item.name} 加入组合`, `逻辑变化：原计划保留为历史来源${reason ? `；原因：${reason}` : ''}`, '计划变化：新组合计划待更新', '提醒变化：原单条提醒已暂缓'] });
+        showToast('已建立组合计划草稿，相关提醒已暂缓');
+      } else {
+        item.parent = null;
+        item.logic = '';
+        item.action = '';
+        item.source = oldParent ? `组合来源 · ${oldParent.name}` : '';
+        item.draft = true;
+        state.ungrouped.unshift(itemId);
+        state.selectedId = itemId;
+        state.history.unshift({ id: `h${Date.now()}`, scope: itemId, type: '策略转场', kind: '主动策略转场', time: '刚刚', title: '持仓移出组合', summary: `${item.name} 已建立独立计划草稿。`, detail: [`持仓变化：从 ${oldParent?.name || '原组合'} 移出`, `逻辑变化：保留组合来源${reason ? `；原因：${reason}` : ''}`, '计划变化：等待保存独立计划', '提醒变化：受影响提醒已暂缓'] });
+        showToast('已建立独立计划草稿，相关提醒已暂缓');
+      }
+      state.pending = null;
+      closeModal();
+      renderAll();
+    }
+
+    function refreshHoldings() {
+      const group = getObject('group-msft');
+      const call = getObject('call-msft');
+      if (!group.children.includes('call-msft')) { showToast('当前没有新的持仓变化'); return; }
+      state.pending = { kind: 'passive-close', itemId: 'call-msft', targetId: 'group-msft' };
+      openModal(`<h2>检测到持仓变更</h2><p>IBKR 显示卖出看涨期权已关闭。相关提醒将暂缓，等待你确认新的策略状态。</p>
+        <div class="transition-box"><div class="transition-state">MSFT 备兑看涨期权</div><div class="transition-arrow">→</div><div class="transition-state">仅保留 100 股 MSFT</div></div>
+        <div class="modal-actions"><button class="button" type="button" data-close-modal>稍后处理</button><button class="button primary" type="button" data-commit-passive>继续管理正股</button></div>`);
+    }
+
+    function commitPassive() {
+      const group = getObject('group-msft');
+      const stock = getObject('stock-msft');
+      const priorName = group.name;
+      group.children = [];
+      state.groupOrder = state.groupOrder.filter((id) => id !== 'group-msft');
+      getObject('call-msft').closed = true;
+      stock.parent = null;
+      stock.source = `组合来源 · ${priorName}`;
+      stock.logic = '';
+      stock.action = '';
+      stock.draft = true;
+      state.ungrouped.unshift('stock-msft');
+      state.history.unshift({ id: `h${Date.now()}`, scope: 'stock-msft', type: '持仓变更', kind: '被动持仓变更', time: '刚刚', title: '卖出看涨期权已关闭', summary: '100 股 MSFT 已转为独立计划草稿，相关提醒已暂缓。', detail: ['持仓变化：卖出 1 手 415 看涨期权已关闭', `逻辑变化：保留 ${priorName} 作为来源`, '计划变化：等待保存剩余正股计划', '提醒变化：受影响提醒已暂缓'] });
+      state.selectedId = 'stock-msft';
+      state.pending = null;
+      closeModal();
+      renderAll();
+      showToast('已记录持仓变更，相关提醒已暂缓');
+    }
+
+    function openHistory(id) {
+      const event = state.history.find((entry) => entry.id === id);
+      if (!event) return;
+      openModal(`<h2>${escapeHtml(event.kind)}</h2><p>${escapeHtml(event.time)} · ${escapeHtml(event.title)}</p><div class="detail-grid">${event.detail.map((item) => { const [title, content] = item.split('：'); return `<div class="detail-block"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(content || '')}</span></div>`; }).join('')}</div><div class="modal-actions"><button class="button primary" type="button" data-close-modal>关闭</button></div>`);
+    }
+
+    function openCreateGroup() {
+      openModal(`<h2>新建组合</h2><p>创建后可将未分组持仓拖入组合。</p><label for="groupName">组合名称</label><input id="groupName" placeholder="例如：MSFT 自定义组合" /><div class="modal-actions"><button class="button" type="button" data-close-modal>取消</button><button class="button primary" type="button" data-create-group>创建</button></div>`);
+    }
+
+    function createGroup() {
+      const input = document.getElementById('groupName');
+      const name = input.value.trim() || 'MSFT 自定义组合';
+      const id = `group-${Date.now()}`;
+      state.objects[id] = { id, type: 'group', name, symbol: 'MSFT', exposure: '--', status: '待补充', children: [], source: '', logic: '', action: '' };
+      state.groupOrder.unshift(id);
+      state.selectedId = id;
+      closeModal();
+      renderAll();
+      showToast('已新建组合');
+    }
+
+    function openModal(html) {
+      const layer = document.getElementById('modalLayer');
+      document.getElementById('modalContent').innerHTML = html;
+      layer.classList.add('open');
+      layer.setAttribute('aria-hidden', 'false');
+      document.querySelectorAll('[data-close-modal]').forEach((button) => button.addEventListener('click', closeModal));
+      document.querySelector('[data-commit-transition]')?.addEventListener('click', commitTransition);
+      document.querySelector('[data-commit-passive]')?.addEventListener('click', commitPassive);
+      document.querySelector('[data-create-group]')?.addEventListener('click', createGroup);
+    }
+
+    function closeModal() {
+      const layer = document.getElementById('modalLayer');
+      layer.classList.remove('open');
+      layer.setAttribute('aria-hidden', 'true');
+      state.pending = null;
+    }
+
+    document.getElementById('holdingSearch').addEventListener('input', (event) => { state.search = event.target.value; renderTree(); });
+    document.getElementById('createGroupButton').addEventListener('click', openCreateGroup);
+    document.getElementById('refreshButton').addEventListener('click', refreshHoldings);
+    document.getElementById('historyFilter').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-filter]');
+      if (!button) return;
+      state.filter = button.dataset.filter;
+      document.querySelectorAll('[data-filter]').forEach((item) => item.classList.toggle('active', item === button));
+      document.querySelector('.filter-menu').removeAttribute('open');
+      renderHistory();
+    });
+    document.getElementById('modalLayer').addEventListener('click', (event) => { if (event.target.id === 'modalLayer') closeModal(); });
+
+    renderAll();
+  </script>
+</body>
+</html>
